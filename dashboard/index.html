@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<!--
+  dashboard/index.html
+
+  The NetWatch live dashboard — a single HTML file with no
+  dependencies, no build step, no framework.
+
+  WHY NO FRAMEWORK (React, Vue, etc.)?
+    In Phase 1, the goal is to prove the API integration works.
+    A plain HTML file with vanilla JavaScript fetch() is the
+    simplest possible proof. No npm, no webpack, no node_modules.
+    Open the file in a browser and it just works.
+
+    Later phases will add more tabs (metrics, packets, devices)
+    and the dashboard will grow. But the core pattern — poll an
+    API endpoint, update the DOM — stays the same.
+
+  HOW TO USE:
+    1. Start the API: docker compose up
+    2. Open this file in a browser: start dashboard/index.html
+    The status card auto-refreshes every 5 seconds.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetWatch — Dashboard</title>
+  <style>
+    /* ── CSS Reset ──────────────────────────────────────────── */
+    /* box-sizing: border-box means padding/border are INCLUDED
+       in an element's declared width/height — much more intuitive. */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Base layout ────────────────────────────────────────── */
+    body {
+      /* Dark background matching GitHub's dark theme palette */
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;   /* horizontally center all content */
+      padding: 2rem;
+      gap: 1rem;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header { text-align: center; }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #58a6ff;         /* GitHub blue */
+      text-transform: uppercase;
+    }
+    header p {
+      color: #8b949e;
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+    }
+
+    /* ── Card ───────────────────────────────────────────────── */
+    /* Each module gets its own card. Phase 1 has one (API Health). */
+    .card {
+      background: #161b22;    /* slightly lighter than page background */
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      width: 100%;
+      max-width: 520px;
+    }
+    .card-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #8b949e;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    /* ── Stat rows ──────────────────────────────────────────── */
+    /* Each row shows one key-value pair: "Status   healthy" */
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.9rem;
+    }
+    .stat:last-child { border-bottom: none; }
+    .stat-label { color: #8b949e; }
+    .stat-value { font-weight: 600; }
+
+    /* ── Status colours ─────────────────────────────────────── */
+    .healthy  { color: #3fb950; }   /* green  */
+    .degraded { color: #f85149; }   /* red    */
+    .unknown  { color: #d29922; }   /* yellow */
+
+    /* ── Error banner ───────────────────────────────────────── */
+    /* Shown when fetch() fails (API is unreachable) */
+    .error-banner {
+      display: none;              /* hidden by default */
+      background: #1f1117;
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      width: 100%;
+      max-width: 520px;
+      color: #f85149;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .error-banner code {
+      background: #2d1117;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    /* ── Refresh indicator ──────────────────────────────────── */
+    .footer {
+      color: #8b949e;
+      font-size: 0.75rem;
+      text-align: center;
+    }
+    /* Pulsing green dot to show the dashboard is live */
+    .live-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #3fb950;
+      margin-right: 5px;
+      vertical-align: middle;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
+    }
+
+    /* ── Phase placeholder cards ────────────────────────────── */
+    .card-placeholder {
+      background: #0d1117;
+      border: 1px dashed #30363d;
+      border-radius: 8px;
+      padding: 1.25rem 2rem;
+      width: 100%;
+      max-width: 520px;
+      text-align: center;
+      color: #484f58;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Header ───────────────────────────────────────────── -->
+  <header>
+    <h1>&#9656; NetWatch</h1>
+    <p>Network Observability Platform</p>
+  </header>
+
+  <!-- ── API Health Card ──────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">API Health</div>
+
+    <div class="stat">
+      <span class="stat-label">Status</span>
+      <span class="stat-value" id="stat-status">—</span>
+    </div>
+
+    <div class="stat">
+      <span class="stat-label">Database</span>
+      <span class="stat-value" id="stat-database">—</span>
+    </div>
+
+    <div class="stat">
+      <span class="stat-label">Environment</span>
+      <span class="stat-value" id="stat-environment">—</span>
+    </div>
+
+    <div class="stat">
+      <span class="stat-label">Uptime</span>
+      <span class="stat-value" id="stat-uptime">—</span>
+    </div>
+
+    <div class="stat">
+      <span class="stat-label">Python Version</span>
+      <span class="stat-value" id="stat-python">—</span>
+    </div>
+
+    <div class="stat">
+      <span class="stat-label">API Version</span>
+      <span class="stat-value" id="stat-version">—</span>
+    </div>
+  </div>
+
+  <!-- ── Error Banner (hidden until fetch fails) ──────────── -->
+  <div class="error-banner" id="error-banner">
+    Cannot reach the API at <code>http://localhost:8000/health</code>.<br />
+    Is Docker Compose running? Try: <code>docker compose up --build</code>
+  </div>
+
+  <!-- ── Phase 2 placeholder ──────────────────────────────── -->
+  <div class="card-placeholder">
+    Probe Engine metrics — available in Phase 2
+  </div>
+
+  <!-- ── Phase 3 placeholder ──────────────────────────────── -->
+  <div class="card-placeholder">
+    Packet Analyzer data — available in Phase 3
+  </div>
+
+  <!-- ── Phase 4 placeholder ──────────────────────────────── -->
+  <div class="card-placeholder">
+    Network Automator devices — available in Phase 4
+  </div>
+
+  <!-- ── Footer ───────────────────────────────────────────── -->
+  <div class="footer">
+    <span class="live-dot"></span>
+    Auto-refreshing every 5 seconds &nbsp;&bull;&nbsp;
+    Last updated: <span id="last-updated">—</span>
+  </div>
+
+
+  <script>
+    /**
+     * NetWatch Dashboard — polling logic
+     *
+     * The browser runs this JavaScript after loading the page.
+     * fetch() is a modern browser API that makes HTTP requests.
+     * It's asynchronous — it doesn't block the page while waiting
+     * for the server to respond.
+     *
+     * async/await is syntactic sugar over Promises. Instead of
+     * nested .then() callbacks, we can write sequential-looking
+     * code that actually runs asynchronously.
+     */
+
+    // The URL of the API. Change this if running on a different host/port.
+    const API_BASE = 'http://localhost:8000';
+
+    // How often to poll the API (milliseconds). 5000ms = 5 seconds.
+    const POLL_INTERVAL_MS = 5000;
+
+    /**
+     * Fetch /health and update the DOM with the results.
+     * Called immediately on page load, then every POLL_INTERVAL_MS.
+     */
+    async function refreshHealth() {
+      const errorBanner = document.getElementById('error-banner');
+
+      try {
+        // fetch() makes an HTTP GET request.
+        // "await" pauses here until the response arrives, without
+        // blocking the rest of the browser (page stays responsive).
+        const response = await fetch(`${API_BASE}/health`);
+
+        // .json() parses the JSON body into a JavaScript object.
+        const data = await response.json();
+
+        // Determine which CSS class to apply based on the value.
+        // CSS classes control the colour (green/red/yellow).
+        const statusClass = data.status === 'healthy'  ? 'healthy'
+                          : data.status === 'degraded' ? 'degraded'
+                          :                               'unknown';
+
+        const dbClass = data.database === 'connected' ? 'healthy' : 'degraded';
+
+        // Update each stat field in the DOM.
+        setValue('stat-status',      data.status,                       statusClass);
+        setValue('stat-database',    data.database,                     dbClass);
+        setValue('stat-environment', data.environment,                  '');
+        setValue('stat-uptime',      formatUptime(data.uptime_seconds), '');
+        setValue('stat-python',      data.python_version,               '');
+        setValue('stat-version',     '0.1.0',                           '');
+
+        // Hide the error banner if we previously showed it.
+        errorBanner.style.display = 'none';
+
+      } catch (err) {
+        // fetch() throws if there's a network error (e.g., API not running).
+        // We show the error banner and mark everything as unreachable.
+        const fields = ['stat-status','stat-database','stat-environment',
+                        'stat-uptime','stat-python','stat-version'];
+        fields.forEach(id => setValue(id, 'unreachable', 'degraded'));
+        errorBanner.style.display = 'block';
+      }
+
+      // Always update the timestamp regardless of success or failure.
+      document.getElementById('last-updated').textContent =
+        new Date().toLocaleTimeString();
+    }
+
+    /**
+     * Update an element's text content and CSS class.
+     *
+     * @param {string} id        - The element's id attribute
+     * @param {string} text      - The text to display
+     * @param {string} cssClass  - The colour class to apply (healthy/degraded/unknown)
+     */
+    function setValue(id, text, cssClass) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      // Reset to base class, then add the colour class if provided.
+      el.className = 'stat-value' + (cssClass ? ' ' + cssClass : '');
+    }
+
+    /**
+     * Convert a number of seconds into a human-readable string.
+     * Examples: "45s", "3m 12s", "1h 23m 45s"
+     *
+     * @param {number} totalSeconds
+     * @returns {string}
+     */
+    function formatUptime(totalSeconds) {
+      if (totalSeconds == null || isNaN(totalSeconds)) return '—';
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = Math.floor(totalSeconds % 60);
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
+    // ── Start ───────────────────────────────────────────────
+    // Run once immediately when the page loads.
+    refreshHealth();
+
+    // Then run again every POLL_INTERVAL_MS milliseconds.
+    // setInterval(fn, ms) schedules fn to run every ms milliseconds.
+    setInterval(refreshHealth, POLL_INTERVAL_MS);
+  </script>
+
+</body>
+</html>
