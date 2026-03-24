@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -31,10 +31,9 @@ class Settings(BaseSettings):
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
-    class Config:
-        # Reads from .env file; real env vars take priority (Kubernetes Secrets win).
-        env_file = ".env"
-        case_sensitive = False
+    # pydantic-settings v2: use SettingsConfigDict instead of the inner Config class.
+    # Reads from .env file; real env vars take priority (Kubernetes Secrets win).
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 
 settings = Settings()

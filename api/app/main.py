@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -18,6 +19,21 @@ def create_app() -> FastAPI:
     Using a factory instead of a module-level instance keeps tests
     isolated — each test gets a fresh app with no shared state.
     """
+
+    # lifespan replaces the deprecated @app.on_event("startup"/"shutdown").
+    # It's a single async context manager: code before yield runs on startup,
+    # code after yield runs on shutdown. FastAPI guarantees the shutdown block
+    # runs even if the startup block raises an exception.
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        logger.info(
+            "NetWatch API starting | env=%s | version=%s",
+            settings.environment,
+            app.version,
+        )
+        yield
+        logger.info("NetWatch API shutting down gracefully")
+
     app = FastAPI(
         title="NetWatch API",
         description=(
@@ -30,21 +46,10 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     app.include_router(health.router)
-
-    @app.on_event("startup")
-    async def on_startup():
-        logger.info(
-            "NetWatch API starting | env=%s | version=%s",
-            settings.environment,
-            app.version,
-        )
-
-    @app.on_event("shutdown")
-    async def on_shutdown():
-        logger.info("NetWatch API shutting down gracefully")
 
     return app
 
