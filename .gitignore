@@ -46,3 +46,6 @@ logs/
 
 # Local learning reference files — never committed
 learning/
+
+# Test databases
+*.db

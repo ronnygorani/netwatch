@@ -24,7 +24,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NetWatch — Dashboard</title>
+  <title>NetAuto — Dashboard</title>
   <style>
     /* ── CSS Reset ──────────────────────────────────────────── */
     /* box-sizing: border-box means padding/border are INCLUDED
@@ -160,8 +160,8 @@
 
   <!-- ── Header ───────────────────────────────────────────── -->
   <header>
-    <h1>&#9656; NetWatch</h1>
-    <p>Network Observability Platform</p>
+    <h1>&#9656; NetAuto</h1>
+    <p>Network Automation Platform</p>
   </header>
 
   <!-- ── API Health Card ──────────────────────────────────── -->
@@ -205,19 +205,22 @@
     Is Docker Compose running? Try: <code>docker compose up --build</code>
   </div>
 
-  <!-- ── Phase 2 placeholder ──────────────────────────────── -->
-  <div class="card-placeholder">
-    Probe Engine metrics — available in Phase 2
+  <!-- ── Device Status Card (Phase 2) ────────────────────── -->
+  <div class="card" style="max-width:640px">
+    <div class="card-title">Device Status</div>
+    <div id="devices-body">
+      <div style="color:#8b949e;font-size:0.85rem;padding:0.5rem 0">Loading devices…</div>
+    </div>
   </div>
 
   <!-- ── Phase 3 placeholder ──────────────────────────────── -->
   <div class="card-placeholder">
-    Packet Analyzer data — available in Phase 3
+    Config Manager — available in Phase 3
   </div>
 
   <!-- ── Phase 4 placeholder ──────────────────────────────── -->
   <div class="card-placeholder">
-    Network Automator devices — available in Phase 4
+    Change Workflow — available in Phase 4
   </div>
 
   <!-- ── Footer ───────────────────────────────────────────── -->
@@ -278,7 +281,7 @@
         setValue('stat-environment', data.environment,                  '');
         setValue('stat-uptime',      formatUptime(data.uptime_seconds), '');
         setValue('stat-python',      data.python_version,               '');
-        setValue('stat-version',     '0.1.0',                           '');
+        setValue('stat-version',     '0.2.0',                           '');
 
         // Hide the error banner if we previously showed it.
         errorBanner.style.display = 'none';
@@ -329,13 +332,50 @@
       return `${s}s`;
     }
 
-    // ── Start ───────────────────────────────────────────────
-    // Run once immediately when the page loads.
-    refreshHealth();
+    async function refreshDevices() {
+      const body = document.getElementById('devices-body');
+      try {
+        const [devicesResp, metricsResp] = await Promise.all([
+          fetch(`${API_BASE}/devices`),
+          fetch(`${API_BASE}/metrics/latest`),
+        ]);
+        const devices = await devicesResp.json();
+        const metrics = await metricsResp.json();
 
-    // Then run again every POLL_INTERVAL_MS milliseconds.
-    // setInterval(fn, ms) schedules fn to run every ms milliseconds.
+        const metricsByDevice = {};
+        metrics.forEach(m => { metricsByDevice[m.device_id] = m; });
+
+        if (devices.length === 0) {
+          body.innerHTML = '<div style="color:#8b949e;font-size:0.85rem;padding:0.5rem 0">No devices in inventory. Add one via POST /devices.</div>';
+          return;
+        }
+
+        const rows = devices.map(d => {
+          const m = metricsByDevice[d.id];
+          const status = m ? m.status : 'unknown';
+          const statusClass = status === 'up' ? 'healthy' : status === 'unknown' ? 'unknown' : 'degraded';
+          const cpu = m?.cpu_percent != null ? `${m.cpu_percent}%` : '—';
+          const mem = m?.memory_percent != null ? `${m.memory_percent}%` : '—';
+          return `
+            <div class="stat">
+              <span class="stat-label">${d.hostname}<br><small style="color:#484f58">${d.site} · ${d.ip_address}</small></span>
+              <span style="display:flex;gap:1.5rem;align-items:center">
+                <span style="color:#8b949e;font-size:0.8rem">CPU ${cpu} &nbsp; MEM ${mem}</span>
+                <span class="stat-value ${statusClass}">${status}</span>
+              </span>
+            </div>`;
+        });
+        body.innerHTML = rows.join('');
+      } catch {
+        body.innerHTML = '<div style="color:#f85149;font-size:0.85rem">Could not load device data</div>';
+      }
+    }
+
+    // ── Start ───────────────────────────────────────────────
+    refreshHealth();
+    refreshDevices();
     setInterval(refreshHealth, POLL_INTERVAL_MS);
+    setInterval(refreshDevices, POLL_INTERVAL_MS);
   </script>
 
 </body>
