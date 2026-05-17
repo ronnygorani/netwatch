@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Secrets — never commit the real .env
+.env
+*.env
+!.env.example
+
+# Docker
+.docker/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Terraform state and secrets (Phase 5)
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/*.tfvars
+!infra/terraform/*.tfvars.example
+
+# C++ build artifacts (Phases 2 & 3)
+probe-engine/build/
+packet-analyzer/build/
+*.o
+*.out
+*.a
+
+# Logs
+*.log
+logs/
+
+# Local learning reference files — never committed
+learning/
