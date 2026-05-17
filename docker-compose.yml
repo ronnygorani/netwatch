@@ -1,0 +1,70 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: netwatch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB}
+    volumes:
+      # Named volume so data persists across container restarts and rebuilds.
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Exposed to the host for direct access with tools like DBeaver.
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - netwatch-net
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: netwatch-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+        apt-get update -qq &&
+        apt-get install -y -qq netcat-openbsd &&
+        chmod +x /app/scripts/wait-for-db.sh &&
+        /app/scripts/wait-for-db.sh db 5432 --
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    volumes:
+      # Bind mounts for hot-reload during development.
+      # Remove for production — code should be baked into the image.
+      - ./api/app:/app/app
+      - ./scripts:/app/scripts
+    healthcheck:
+      test: ["CMD", "python", "-c",
+        "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - netwatch-net
+
+networks:
+  netwatch-net:
+    driver: bridge
+    # Containers communicate by service name — Docker DNS resolves "db"
+    # to the db container's internal IP automatically.
+
+volumes:
+  postgres_data:
+    driver: local
