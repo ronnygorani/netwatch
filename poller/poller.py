@@ -119,7 +119,7 @@ def run_poll_cycle() -> None:
 
 
 def main() -> None:
-    logger.info("NetAuto poller starting | interval=%ds | api=%s", POLL_INTERVAL, API_BASE)
+    logger.info("NetWatch poller starting | interval=%ds | api=%s", POLL_INTERVAL, API_BASE)
     while True:
         run_poll_cycle()
         time.sleep(POLL_INTERVAL)
