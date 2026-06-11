@@ -33,13 +33,6 @@ infra/terraform/*.tfstate.backup
 infra/terraform/*.tfvars
 !infra/terraform/*.tfvars.example
 
-# C++ build artifacts (Phases 2 & 3)
-probe-engine/build/
-packet-analyzer/build/
-*.o
-*.out
-*.a
-
 # Logs
 *.log
 logs/
