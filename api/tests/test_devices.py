@@ -39,7 +39,9 @@ def test_update_device(client):
 
 
 def test_filter_devices_by_site(client):
-    client.post("/devices", json={"hostname": "SW-02", "ip_address": "10.0.0.2", "site": "Branch-B"})
+    client.post(
+        "/devices", json={"hostname": "SW-02", "ip_address": "10.0.0.2", "site": "Branch-B"}
+    )
     response = client.get("/devices?site=Branch-B")
     assert response.status_code == 200
     assert all(d["site"] == "Branch-B" for d in response.json())
