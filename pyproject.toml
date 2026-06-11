@@ -1,0 +1,27 @@
+# Repo-wide tooling configuration. Ruff discovers this file by walking up
+# from whatever it's linting, so it covers api/ and poller/ alike.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E4",  # import errors
+    "E7",  # statement errors
+    "E9",  # runtime errors
+    "F",   # pyflakes (unused imports/variables, undefined names)
+    "I",   # isort — enforce sorted import blocks
+    "UP",  # pyupgrade — prefer modern syntax for the target version
+    "B",   # bugbear — likely bugs and design problems
+]
+ignore = [
+    # FastAPI's dependency injection idiom calls Depends() in argument
+    # defaults by design; bugbear's warning doesn't apply here.
+    "B008",
+]
+
+[tool.ruff.lint.isort]
+# Our application package — keeps `from app.* import ...` in its own
+# import block below third-party packages instead of mixed among them.
+known-first-party = ["app"]

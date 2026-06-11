@@ -1,0 +1,19 @@
+# Automated dependency update PRs. Pinned versions are reproducible but rot
+# silently — Dependabot proposes the bumps so we review them like any change.
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/poller"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
