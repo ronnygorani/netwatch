@@ -4,7 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
+from app.database import engine
+from app.models import Device, Metric  # noqa: F401 — imported to register with Base
+from app.database import Base
 from app.routers import health
+from app.routers import devices, metrics
 
 logging.basicConfig(
     level=settings.log_level.upper(),
@@ -20,36 +24,36 @@ def create_app() -> FastAPI:
     isolated — each test gets a fresh app with no shared state.
     """
 
-    # lifespan replaces the deprecated @app.on_event("startup"/"shutdown").
-    # It's a single async context manager: code before yield runs on startup,
-    # code after yield runs on shutdown. FastAPI guarantees the shutdown block
-    # runs even if the startup block raises an exception.
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info(
-            "NetWatch API starting | env=%s | version=%s",
+            "NetAuto API starting | env=%s | version=%s",
             settings.environment,
             app.version,
         )
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables verified")
         yield
-        logger.info("NetWatch API shutting down gracefully")
+        logger.info("NetAuto API shutting down gracefully")
 
     app = FastAPI(
-        title="NetWatch API",
+        title="NetAuto API",
         description=(
-            "Unified REST API for the NetWatch Network Observability Platform.\n\n"
+            "Unified REST API for the NetAuto Network Automation Platform.\n\n"
             "All modules communicate exclusively through this API:\n"
-            "- Phase 2: C++ probe engine → POST /metrics\n"
-            "- Phase 3: C++ packet analyzer → POST /packets\n"
-            "- Phase 4: Python automator → GET/POST /devices\n"
+            "- Phase 2: Device inventory + Netmiko poller → /devices, /metrics\n"
+            "- Phase 3: Config manager → /configs\n"
+            "- Phase 4: Change workflow → /changes\n"
         ),
-        version="0.1.0",
+        version="0.2.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
     )
 
     app.include_router(health.router)
+    app.include_router(devices.router)
+    app.include_router(metrics.router)
 
     return app
 
