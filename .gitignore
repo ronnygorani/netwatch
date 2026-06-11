@@ -44,5 +44,7 @@ packet-analyzer/build/
 *.log
 logs/
 
-# Local learning reference files — never committed
+# Local learning reference files — never committed.
+# Heavily-annotated walkthrough docs that mirror the codebase for study.
+learn/
 learning/
