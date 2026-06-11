@@ -4,11 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
-from app.database import engine
+from app.database import Base, engine
 from app.models import Device, Metric  # noqa: F401 — imported to register with Base
-from app.database import Base
-from app.routers import health
-from app.routers import devices, metrics
+from app.routers import devices, health, metrics
 
 logging.basicConfig(
     level=settings.log_level.upper(),
@@ -27,23 +25,22 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info(
-            "NetAuto API starting | env=%s | version=%s",
+            "NetWatch API starting | env=%s | version=%s",
             settings.environment,
             app.version,
         )
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables verified")
         yield
-        logger.info("NetAuto API shutting down gracefully")
+        logger.info("NetWatch API shutting down gracefully")
 
     app = FastAPI(
-        title="NetAuto API",
+        title="NetWatch API",
         description=(
-            "Unified REST API for the NetAuto Network Automation Platform.\n\n"
-            "All modules communicate exclusively through this API:\n"
-            "- Phase 2: Device inventory + Netmiko poller → /devices, /metrics\n"
-            "- Phase 3: Config manager → /configs\n"
-            "- Phase 4: Change workflow → /changes\n"
+            "Unified REST API for the NetWatch network automation platform.\n\n"
+            "Current modules:\n"
+            "- Device inventory → /devices\n"
+            "- Health metrics ingestion and queries → /metrics\n"
         ),
         version="0.2.0",
         docs_url="/docs",

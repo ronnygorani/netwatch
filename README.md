@@ -1,10 +1,10 @@
-# NetAuto — Network Automation Platform
+# NetWatch — Network Automation Platform
 
 A centralized network automation platform for multi-site Cisco environments, built as a portfolio project targeting DevOps, Platform, and Solution Engineering roles.
 
 ## What it does
 
-NetAuto gives network teams a single platform to monitor device health, manage configurations, and control changes across every site — with a full audit trail for every action.
+NetWatch gives network teams a single platform to monitor device health, manage configurations, and control changes across every site — with a full audit trail for every action.
 
 - **Device Inventory** — centralised database of all switches, routers, and firewalls across all sites
 - **Health Poller** — SSHes into each device on a schedule via Netmiko, collects CPU, memory, and uptime, stores time-series metrics
