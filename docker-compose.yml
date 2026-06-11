@@ -34,17 +34,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      sh -c "
-        apt-get update -qq &&
-        apt-get install -y -qq netcat-openbsd &&
-        chmod +x /app/scripts/wait-for-db.sh &&
-        /app/scripts/wait-for-db.sh db 5432 --
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      "
+    # Dev override of the image CMD: --reload restarts uvicorn on code changes.
+    # Startup ordering is handled by depends_on (waits for pg_isready) and the
+    # engine's pool_pre_ping; no extra wait script needed.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
+      # Bind mount for hot-reload during development.
+      # Remove for production — code should be baked into the image.
       - ./api/app:/app/app
-      - ./scripts:/app/scripts
     healthcheck:
       test: ["CMD", "python", "-c",
         "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
