@@ -8,8 +8,8 @@ NetWatch gives network teams a single platform to monitor device health, manage 
 
 - **Device Inventory** — centralised database of all switches, routers, and firewalls across all sites
 - **Health Poller** — SSHes into each device on a schedule via Netmiko, collects CPU, memory, and uptime, stores time-series metrics
-- **Config Manager** *(Phase 3)* — pulls running configs, compares against Jinja2 baseline templates, flags any drift
-- **Change Workflow** *(Phase 4)* — network admins submit change requests that open a GitHub PR; a senior engineer approves; merge triggers automatic deployment to the device with a full audit log
+- **Nautobot Source of Truth** *(Phase 3)* — stand up Nautobot as the single SoT; seed sites and devices; FastAPI reads inventory via `pynautobot`; dashboard shows live SoT data
+- **Ansible Automation** *(Phase 4)* — Ansible pulls dynamic inventory from Nautobot, runs backup and fact-gathering playbooks; FastAPI triggers runs via `ansible-runner` with job-status tracking
 
 All modules communicate exclusively through a single FastAPI REST API backed by PostgreSQL, surfaced via a live HTML dashboard.
 
@@ -58,8 +58,8 @@ API live at `localhost:8000` — interactive docs at `localhost:8000/docs`
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | FastAPI `/health`, PostgreSQL, Dockerfile, Docker Compose, GitHub Actions CI | ✅ |
-| 2 | Device inventory API, Netmiko poller, live dashboard, 16 passing tests | ✅ |
-| 3 | Config manager — pull running configs, Jinja2 baseline templates, drift detection | 🔲 |
-| 4 | Change workflow — GitHub PR approval, auto-deploy via Actions, audit log | 🔲 |
-| 5 | Kubernetes manifests, Terraform AWS (EKS, ECR, VPC), GitHub Actions deploy | 🔲 |
+| 1 | FastAPI `/health`, PostgreSQL, Dockerfile, Docker Compose, GitHub Actions CI | Completed |
+| 2 | Device inventory API, Netmiko poller, live dashboard, 16 passing tests | Completed |
+| 3 | Nautobot Source of Truth — stand up Nautobot + Redis, seed inventory, FastAPI reads via `pynautobot` | Planned |
+| 4 | Ansible Automation — dynamic inventory from Nautobot, backup/fact playbooks, `ansible-runner` job API | Planned |
+| 5 | Kubernetes manifests, Terraform AWS (EKS, ECR, VPC), GitHub Actions deploy | Planned |
