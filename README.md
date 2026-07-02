@@ -56,10 +56,16 @@ API live at `localhost:8000` — interactive docs at `localhost:8000/docs`
 
 ## Build Phases
 
+Full architecture, technology rationale, and roadmap with acceptance criteria live in
+the **[design document](docs/DESIGN.md)** — the authoritative plan.
+
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | FastAPI `/health`, PostgreSQL, Dockerfile, Docker Compose, GitHub Actions CI | Completed |
 | 2 | Device inventory API, Netmiko poller, live dashboard, 16 passing tests | Completed |
-| 3 | Nautobot Source of Truth — stand up Nautobot + Redis, seed inventory, FastAPI reads via `pynautobot` | Planned |
-| 4 | Ansible Automation — dynamic inventory from Nautobot, backup/fact playbooks, `ansible-runner` job API | Planned |
-| 5 | Kubernetes manifests, Terraform AWS (EKS, ECR, VPC), GitHub Actions deploy | Planned |
+| 3 | Production hardening — auth, Alembic migrations, concurrent polling, pagination, observability | Planned |
+| 4 | Virtual lab — ContainerLab + Arista cEOS topology, multi-vendor polling via NAPALM | Planned |
+| 5 | Nautobot Source of Truth — inventory moves to Nautobot, webhooks, `pynautobot` | Planned |
+| 6 | Ansible & change workflow — dynamic inventory, job queue, propose → approve → execute → validate → audit | Planned |
+| 7 | Differentiators — config drift detection, gNMI streaming telemetry, self-healing demo | Planned |
+| 8 | Cloud — Kubernetes manifests, Terraform AWS (EKS, ECR, VPC), GitHub Actions deploy | Planned |

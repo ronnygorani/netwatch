@@ -42,5 +42,8 @@ logs/
 learn/
 learning/
 
+# Design docs — kept local for now, will be committed once reviewed.
+docs/
+
 # Test databases
 *.db
