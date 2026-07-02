@@ -1,2 +1,2 @@
-netmiko==4.4.0
+netmiko==4.7.0
 httpx==0.28.1
