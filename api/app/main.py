@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
-from app.database import Base, engine
 from app.models import Device, Metric  # noqa: F401 — imported to register with Base
 from app.routers import devices, health, metrics
 
@@ -24,13 +23,13 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Schema is managed by Alembic (`alembic upgrade head`), run as a
+        # deploy step — the app itself never mutates the schema at startup.
         logger.info(
             "NetWatch API starting | env=%s | version=%s",
             settings.environment,
             app.version,
         )
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables verified")
         yield
         logger.info("NetWatch API shutting down gracefully")
 
