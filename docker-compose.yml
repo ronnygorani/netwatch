@@ -34,14 +34,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Dev override of the image CMD: --reload restarts uvicorn on code changes.
-    # Startup ordering is handled by depends_on (waits for pg_isready) and the
-    # engine's pool_pre_ping; no extra wait script needed.
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Dev override of the image CMD: apply migrations, then start uvicorn with
+    # --reload. In production, `alembic upgrade head` runs as a separate deploy
+    # step (K8s init container / release job) — never inside the app process.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
-      # Bind mount for hot-reload during development.
+      # Bind mounts for hot-reload during development.
       # Remove for production — code should be baked into the image.
       - ./api/app:/app/app
+      - ./api/alembic:/app/alembic
+      - ./api/alembic.ini:/app/alembic.ini
     healthcheck:
       test: ["CMD", "python", "-c",
         "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

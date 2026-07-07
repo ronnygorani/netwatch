@@ -78,6 +78,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r api/requirements-dev.txt
 
+      # Prove the migration chain runs clean against real PostgreSQL,
+      # then prove it is reversible, then land on head for good.
+      - name: Run database migrations (up, down, up)
+        working-directory: api
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
       - name: Run tests
         working-directory: api
         run: pytest tests/ -v --tb=short --junitxml=test-results.xml
