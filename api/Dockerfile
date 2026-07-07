@@ -23,6 +23,10 @@ WORKDIR /app
 
 COPY --from=builder /install /usr/local
 COPY app/ ./app/
+# Migrations ship with the image so `alembic upgrade head` can run as a
+# deploy step from the same artifact that serves traffic.
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 
 USER netwatch
 
