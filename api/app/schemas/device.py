@@ -13,9 +13,11 @@ class DeviceCreate(BaseModel):
 
 
 class DeviceUpdate(BaseModel):
-    hostname: str | None = Field(default=None, max_length=64)
-    site: str | None = Field(default=None, max_length=64)
-    device_type: str | None = Field(default=None, max_length=32)
+    # min_length=1 mirrors DeviceCreate — without it, PATCH {"hostname": ""}
+    # would blank a device's name (omit the field to leave it unchanged).
+    hostname: str | None = Field(default=None, min_length=1, max_length=64)
+    site: str | None = Field(default=None, min_length=1, max_length=64)
+    device_type: str | None = Field(default=None, min_length=1, max_length=32)
     port: int | None = Field(default=None, ge=1, le=65535)
     is_active: bool | None = None
 

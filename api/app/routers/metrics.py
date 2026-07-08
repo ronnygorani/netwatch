@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,7 +18,16 @@ def ingest_metric(payload: MetricCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
     metric = Metric(**payload.model_dump())
     db.add(metric)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The device-exists check above races with DELETE /devices (FM-A3):
+        # the device can vanish between check and commit. The FK constraint
+        # catches it — translate to the same 404 the check would have given.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
+        ) from None
     db.refresh(metric)
     return metric
 
