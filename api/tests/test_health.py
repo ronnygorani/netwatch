@@ -36,5 +36,5 @@ def test_health_response_has_all_required_fields(client):
     with patch("app.routers.health.check_db_connection", return_value=True):
         response = client.get("/health")
 
-    required = {"status", "environment", "uptime_seconds", "database", "python_version"}
+    required = {"status", "environment", "uptime_seconds", "database", "python_version", "version"}
     assert required.issubset(response.json().keys())

@@ -281,7 +281,7 @@
         setValue('stat-environment', data.environment,                  '');
         setValue('stat-uptime',      formatUptime(data.uptime_seconds), '');
         setValue('stat-python',      data.python_version,               '');
-        setValue('stat-version',     '0.2.0',                           '');
+        setValue('stat-version',     data.version ?? '—',               '');
 
         // Hide the error banner if we previously showed it.
         errorBanner.style.display = 'none';
@@ -332,6 +332,20 @@
       return `${s}s`;
     }
 
+    /**
+     * Escape a value for safe insertion into innerHTML.
+     *
+     * Device fields (hostname, site) are user-supplied via the API — without
+     * escaping, a device named "<img src=x onerror=...>" would execute
+     * JavaScript in every dashboard viewer's browser (stored XSS, FM-A7).
+     * Rule: anything that came from outside this file gets escaped.
+     */
+    function esc(value) {
+      return String(value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[c]));
+    }
+
     async function refreshDevices() {
       const body = document.getElementById('devices-body');
       try {
@@ -358,10 +372,10 @@
           const mem = m?.memory_percent != null ? `${m.memory_percent}%` : '—';
           return `
             <div class="stat">
-              <span class="stat-label">${d.hostname}<br><small style="color:#484f58">${d.site} · ${d.ip_address}</small></span>
+              <span class="stat-label">${esc(d.hostname)}<br><small style="color:#484f58">${esc(d.site)} · ${esc(d.ip_address)}</small></span>
               <span style="display:flex;gap:1.5rem;align-items:center">
-                <span style="color:#8b949e;font-size:0.8rem">CPU ${cpu} &nbsp; MEM ${mem}</span>
-                <span class="stat-value ${statusClass}">${status}</span>
+                <span style="color:#8b949e;font-size:0.8rem">CPU ${esc(cpu)} &nbsp; MEM ${esc(mem)}</span>
+                <span class="stat-value ${statusClass}">${esc(status)}</span>
               </span>
             </div>`;
         });

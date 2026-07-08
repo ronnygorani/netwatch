@@ -2,7 +2,9 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app import __version__
 from app.config import settings
 from app.models import Device, Metric  # noqa: F401 — imported to register with Base
 from app.routers import devices, health, metrics
@@ -41,10 +43,19 @@ def create_app() -> FastAPI:
             "- Device inventory → /devices\n"
             "- Health metrics ingestion and queries → /metrics\n"
         ),
-        version="0.2.0",
+        version=__version__,
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
+    )
+
+    # Browsers block cross-origin responses without this — the dashboard is
+    # served from a different origin (file:// or a static host) than the API.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["*"],
     )
 
     app.include_router(health.router)

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -34,7 +35,17 @@ def create_device(payload: DeviceCreate, db: Session = Depends(get_db)):
         )
     device = Device(**payload.model_dump(mode="json"))
     db.add(device)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The check above is a race (FM-A2): two concurrent creates with the
+        # same IP can both pass it. The DB unique constraint is the real
+        # guard — translate its violation to the same 409 the contract promises.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Device with IP {payload.ip_address} already exists",
+        ) from None
     db.refresh(device)
     return device
 

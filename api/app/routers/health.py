@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app import __version__
 from app.config import settings
 from app.database import check_db_connection
 
@@ -19,6 +20,7 @@ class HealthResponse(BaseModel):
     uptime_seconds: float
     database: str
     python_version: str
+    version: str
 
 
 @router.get("", response_model=HealthResponse)
@@ -36,6 +38,7 @@ def health_check():
         uptime_seconds=round(time.time() - _start_time, 2),
         database="connected" if db_ok else "unreachable",
         python_version=platform.python_version(),
+        version=__version__,
     )
 
     if not db_ok:

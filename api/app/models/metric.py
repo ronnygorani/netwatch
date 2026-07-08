@@ -1,13 +1,18 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from app.database import Base
 
 
 class Metric(Base):
     __tablename__ = "metrics"
+
+    # Composite index serving the two hot queries: latest-per-device
+    # (GROUP BY device_id, MAX(collected_at)) and per-device history
+    # (WHERE device_id = ? ORDER BY collected_at DESC).
+    __table_args__ = (Index("ix_metrics_device_id_collected_at", "device_id", "collected_at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     device_id: Mapped[int] = mapped_column(
@@ -25,4 +30,8 @@ class Metric(Base):
     uptime_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     raw_output: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    device = relationship("Device", backref="metrics")
+    # passive_deletes lets the DATABASE's ON DELETE CASCADE do the work.
+    # Without it, the ORM tries to null out metrics.device_id (a NOT NULL
+    # column) when a device is deleted → IntegrityError → 500 on any
+    # DELETE /devices/{id} that has metric history.
+    device = relationship("Device", backref=backref("metrics", passive_deletes=True))

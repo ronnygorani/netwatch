@@ -12,7 +12,7 @@ class Device(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     hostname: Mapped[str] = mapped_column(String(64), nullable=False)
     ip_address: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
-    site: Mapped[str] = mapped_column(String(64), nullable=False)
+    site: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     device_type: Mapped[str] = mapped_column(String(32), nullable=False, default="cisco_ios")
     port: Mapped[int] = mapped_column(Integer, nullable=False, default=22)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
