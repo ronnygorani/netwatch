@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,31 @@ class Settings(BaseSettings):
 
     # Runtime context
     environment: str = "development"
+
+    # CORS: comma-separated list of allowed browser origins, or "*" for all.
+    # "*" is acceptable for a credential-less read API in dev; production
+    # deployments set an explicit origin list.
+    cors_origins: str = "*"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def _refuse_default_password_outside_dev(self) -> "Settings":
+        """Fail closed: the shipped default password must never reach a real environment.
+
+        Without this guard, a missing .env silently starts the stack with
+        user/password "netwatch"/"changeme" (FM-C2).
+        """
+        if self.environment not in ("development", "testing") and (
+            self.postgres_password == "changeme"
+        ):
+            raise ValueError(
+                "POSTGRES_PASSWORD is still the default 'changeme' but "
+                f"ENVIRONMENT={self.environment!r} — refusing to start. Set a real password."
+            )
+        return self
 
     @property
     def database_url(self) -> str:

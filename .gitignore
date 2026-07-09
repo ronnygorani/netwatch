@@ -44,6 +44,7 @@ learning/
 
 # Design docs — kept local for now, will be committed once reviewed.
 docs/
+CLAUDE.md
 
 # Test databases
 *.db

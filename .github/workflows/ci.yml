@@ -91,6 +91,11 @@ jobs:
         working-directory: api
         run: pytest tests/ -v --tb=short --junitxml=test-results.xml
 
+      # Parser tests are pure stdlib — no netmiko install needed.
+      - name: Run poller unit tests
+        working-directory: poller
+        run: pytest tests/ -v --tb=short
+
       - name: Upload test results
         uses: actions/upload-artifact@v7
         if: always()
