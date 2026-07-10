@@ -9,8 +9,7 @@ class MetricCreate(BaseModel):
     cpu_percent: float | None = Field(default=None, ge=0, le=100)
     memory_percent: float | None = Field(default=None, ge=0, le=100)
     uptime_seconds: int | None = Field(default=None, ge=0)
-    # Cap raw CLI output so a pathological device can't bloat rows;
-    # the poller truncates below this before sending.
+    # Poller truncates to 8k before sending; cap guards other clients.
     raw_output: str | None = Field(default=None, max_length=10_000)
 
 

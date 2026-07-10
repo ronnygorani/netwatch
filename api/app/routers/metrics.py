@@ -3,7 +3,9 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth import require_scope
 from app.database import get_db
+from app.models.api_key import ApiKey
 from app.models.device import Device
 from app.models.metric import Metric
 from app.schemas.metric import MetricCreate, MetricResponse
@@ -12,7 +14,11 @@ router = APIRouter(tags=["metrics"])
 
 
 @router.post("/metrics", response_model=MetricResponse, status_code=status.HTTP_201_CREATED)
-def ingest_metric(payload: MetricCreate, db: Session = Depends(get_db)):
+def ingest_metric(
+    payload: MetricCreate,
+    db: Session = Depends(get_db),
+    _key: ApiKey = Depends(require_scope("metrics:write")),
+):
     device = db.query(Device).filter(Device.id == payload.device_id).first()
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
@@ -21,9 +27,7 @@ def ingest_metric(payload: MetricCreate, db: Session = Depends(get_db)):
     try:
         db.commit()
     except IntegrityError:
-        # The device-exists check above races with DELETE /devices (FM-A3):
-        # the device can vanish between check and commit. The FK constraint
-        # catches it — translate to the same 404 the check would have given.
+        # Device can be deleted between the check and the commit (FM-A3).
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"

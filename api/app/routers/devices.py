@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth import require_scope
 from app.database import get_db
+from app.models.api_key import ApiKey
 from app.models.device import Device
 from app.schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+
+# Writes require devices:write; reads stay open until human auth (Phase 6).
 
 
 @router.get("", response_model=list[DeviceResponse])
@@ -26,7 +30,11 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
-def create_device(payload: DeviceCreate, db: Session = Depends(get_db)):
+def create_device(
+    payload: DeviceCreate,
+    db: Session = Depends(get_db),
+    _key: ApiKey = Depends(require_scope("devices:write")),
+):
     existing = db.query(Device).filter(Device.ip_address == str(payload.ip_address)).first()
     if existing:
         raise HTTPException(
@@ -38,9 +46,7 @@ def create_device(payload: DeviceCreate, db: Session = Depends(get_db)):
     try:
         db.commit()
     except IntegrityError:
-        # The check above is a race (FM-A2): two concurrent creates with the
-        # same IP can both pass it. The DB unique constraint is the real
-        # guard — translate its violation to the same 409 the contract promises.
+        # Concurrent create with the same IP can slip past the check (FM-A2).
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -51,7 +57,12 @@ def create_device(payload: DeviceCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{device_id}", response_model=DeviceResponse)
-def update_device(device_id: int, payload: DeviceUpdate, db: Session = Depends(get_db)):
+def update_device(
+    device_id: int,
+    payload: DeviceUpdate,
+    db: Session = Depends(get_db),
+    _key: ApiKey = Depends(require_scope("devices:write")),
+):
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
@@ -63,7 +74,11 @@ def update_device(device_id: int, payload: DeviceUpdate, db: Session = Depends(g
 
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_device(device_id: int, db: Session = Depends(get_db)):
+def delete_device(
+    device_id: int,
+    db: Session = Depends(get_db),
+    _key: ApiKey = Depends(require_scope("devices:write")),
+):
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")

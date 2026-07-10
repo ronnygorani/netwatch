@@ -5,27 +5,21 @@ from sqlalchemy import engine_from_config, pool
 
 from app.config import settings
 from app.database import Base
-from app.models import Device, Metric  # noqa: F401 — imported to register tables with Base
+from app.models import ApiKey, Device, Metric  # noqa: F401 — registers tables with Base
 
 config = context.config
 
-# One source of truth for credentials: the same Settings class the API uses.
-# Alembic never carries its own database URL.
+# DB URL comes from the app's Settings — alembic.ini carries no credentials.
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# What autogenerate compares the live database against.
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Emit migration SQL to stdout without touching a database.
-
-    Used for review ("what would this migration do?") and for DBA-gated
-    environments where the SQL is applied by hand.
-    """
+    """Emit migration SQL to stdout without a DB connection (--sql mode)."""
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,

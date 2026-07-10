@@ -3,11 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """All configuration for the NetWatch API, read from environment variables.
-
-    Split into individual fields (not a single DATABASE_URL) so each
-    value can be rotated independently in a secrets manager.
-    """
+    """Environment-driven configuration. DB credentials are split into
+    individual fields so each can be rotated independently in a secrets manager."""
 
     # Database
     postgres_user: str = "netwatch"
@@ -24,9 +21,7 @@ class Settings(BaseSettings):
     # Runtime context
     environment: str = "development"
 
-    # CORS: comma-separated list of allowed browser origins, or "*" for all.
-    # "*" is acceptable for a credential-less read API in dev; production
-    # deployments set an explicit origin list.
+    # Comma-separated allowed origins; "*" is dev-only.
     cors_origins: str = "*"
 
     @property
@@ -35,11 +30,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _refuse_default_password_outside_dev(self) -> "Settings":
-        """Fail closed: the shipped default password must never reach a real environment.
-
-        Without this guard, a missing .env silently starts the stack with
-        user/password "netwatch"/"changeme" (FM-C2).
-        """
+        """Refuse to start with the shipped default password outside dev/testing (FM-C2)."""
         if self.environment not in ("development", "testing") and (
             self.postgres_password == "changeme"
         ):
@@ -51,14 +42,12 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Assemble the SQLAlchemy connection string from individual parts."""
         return (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
-    # pydantic-settings v2: use SettingsConfigDict instead of the inner Config class.
-    # Reads from .env file; real env vars take priority (Kubernetes Secrets win).
+    # Real env vars take priority over .env values.
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 

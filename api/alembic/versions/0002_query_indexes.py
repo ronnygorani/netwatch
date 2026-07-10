@@ -1,11 +1,7 @@
 """Indexes for the hot query paths.
 
-- devices.site: GET /devices?site= filters on it
-- metrics (device_id, collected_at): serves both the latest-per-device
-  aggregation and per-device history ordering, replacing two separate
-  single-column scans with one composite index walk
-
-First follow-up migration — proves the chain works beyond the initial schema.
+devices.site serves the ?site= filter; the composite (device_id, collected_at)
+serves latest-per-device aggregation and per-device history ordering.
 
 Revision ID: 0002
 Revises: 0001

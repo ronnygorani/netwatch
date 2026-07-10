@@ -34,13 +34,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Dev override of the image CMD: apply migrations, then start uvicorn with
-    # --reload. In production, `alembic upgrade head` runs as a separate deploy
-    # step (K8s init container / release job) — never inside the app process.
+    # Dev-only: migrate then reload-serve. In prod, migrations run as a deploy step.
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
-      # Bind mounts for hot-reload during development.
-      # Remove for production — code should be baked into the image.
+      # Dev bind mounts for hot-reload; prod runs code baked into the image.
       - ./api/app:/app/app
       - ./api/alembic:/app/alembic
       - ./api/alembic.ini:/app/alembic.ini
@@ -65,6 +62,8 @@ services:
     environment:
       API_BASE_URL: http://api:8000
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+      # Mint with: docker compose exec api python -m app.create_api_key poller "metrics:write"
+      NETWATCH_API_KEY: ${NETWATCH_API_KEY:-}
     depends_on:
       api:
         condition: service_healthy
