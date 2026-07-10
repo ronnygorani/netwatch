@@ -13,6 +13,7 @@ logging.basicConfig(
 logger = logging.getLogger("poller")
 
 API_BASE = os.getenv("API_BASE_URL", "http://api:8000")
+API_KEY = os.getenv("NETWATCH_API_KEY", "")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "60"))
 SSH_USER = os.getenv("NETMIKO_USERNAME", "")
 SSH_PASS = os.getenv("NETMIKO_PASSWORD", "")
@@ -71,9 +72,8 @@ def poll_device(device: dict) -> dict:
 def run_poll_cycle() -> None:
     logger.info("Starting poll cycle")
 
-    # One client for the whole cycle: connection reuse instead of a fresh
-    # TCP handshake per request (one GET + one POST per device).
-    with httpx.Client(base_url=API_BASE, timeout=10) as client:
+    # One client per cycle for connection reuse; key authenticates all requests.
+    with httpx.Client(base_url=API_BASE, timeout=10, headers={"X-API-Key": API_KEY}) as client:
         try:
             devices = fetch_devices(client)
         except Exception as exc:

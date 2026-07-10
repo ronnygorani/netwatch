@@ -13,8 +13,7 @@ class DeviceCreate(BaseModel):
 
 
 class DeviceUpdate(BaseModel):
-    # min_length=1 mirrors DeviceCreate — without it, PATCH {"hostname": ""}
-    # would blank a device's name (omit the field to leave it unchanged).
+    # min_length mirrors DeviceCreate: omit a field to leave it unchanged, "" is invalid.
     hostname: str | None = Field(default=None, min_length=1, max_length=64)
     site: str | None = Field(default=None, min_length=1, max_length=64)
     device_type: str | None = Field(default=None, min_length=1, max_length=32)

@@ -25,11 +25,7 @@ class HealthResponse(BaseModel):
 
 @router.get("", response_model=HealthResponse)
 def health_check():
-    """Return the operational status of the API and its dependencies.
-
-    Returns HTTP 200 when healthy, HTTP 503 when a dependency is down.
-    The 503 is what Kubernetes readiness probes act on.
-    """
+    """200 when healthy, 503 when the DB is unreachable (readiness-probe signal)."""
     db_ok = check_db_connection()
 
     response_data = HealthResponse(

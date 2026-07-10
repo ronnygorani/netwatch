@@ -1,24 +1,7 @@
 <!DOCTYPE html>
 <!--
-  dashboard/index.html
-
-  The NetWatch live dashboard — a single HTML file with no
-  dependencies, no build step, no framework.
-
-  WHY NO FRAMEWORK (React, Vue, etc.)?
-    In Phase 1, the goal is to prove the API integration works.
-    A plain HTML file with vanilla JavaScript fetch() is the
-    simplest possible proof. No npm, no webpack, no node_modules.
-    Open the file in a browser and it just works.
-
-    Later phases will add more tabs (metrics, packets, devices)
-    and the dashboard will grow. But the core pattern — poll an
-    API endpoint, update the DOM — stays the same.
-
-  HOW TO USE:
-    1. Start the API: docker compose up
-    2. Open this file in a browser: start dashboard/index.html
-    The status card auto-refreshes every 5 seconds.
+  NetWatch live dashboard — single file, no framework, no build step.
+  Usage: docker compose up, then open this file in a browser.
 -->
 <html lang="en">
 <head>
@@ -26,21 +9,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NetWatch — Dashboard</title>
   <style>
-    /* ── CSS Reset ──────────────────────────────────────────── */
-    /* box-sizing: border-box means padding/border are INCLUDED
-       in an element's declared width/height — much more intuitive. */
+    /* ── Reset ──────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── Base layout ────────────────────────────────────────── */
+    /* ── Base layout (GitHub dark palette) ──────────────────── */
     body {
-      /* Dark background matching GitHub's dark theme palette */
       background: #0d1117;
       color: #c9d1d9;
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      align-items: center;   /* horizontally center all content */
+      align-items: center;
       padding: 2rem;
       gap: 1rem;
     }
@@ -60,8 +40,7 @@
       margin-top: 0.25rem;
     }
 
-    /* ── Card ───────────────────────────────────────────────── */
-    /* Each module gets its own card. Phase 1 has one (API Health). */
+    /* ── Cards ──────────────────────────────────────────────── */
     .card {
       background: #161b22;    /* slightly lighter than page background */
       border: 1px solid #30363d;
@@ -80,7 +59,6 @@
     }
 
     /* ── Stat rows ──────────────────────────────────────────── */
-    /* Each row shows one key-value pair: "Status   healthy" */
     .stat {
       display: flex;
       justify-content: space-between;
@@ -98,10 +76,9 @@
     .degraded { color: #f85149; }   /* red    */
     .unknown  { color: #d29922; }   /* yellow */
 
-    /* ── Error banner ───────────────────────────────────────── */
-    /* Shown when fetch() fails (API is unreachable) */
+    /* ── Error banner (shown when the API is unreachable) ───── */
     .error-banner {
-      display: none;              /* hidden by default */
+      display: none;
       background: #1f1117;
       border: 1px solid #f85149;
       border-radius: 8px;
@@ -119,13 +96,12 @@
       font-family: monospace;
     }
 
-    /* ── Refresh indicator ──────────────────────────────────── */
+    /* ── Footer / live indicator ────────────────────────────── */
     .footer {
       color: #8b949e;
       font-size: 0.75rem;
       text-align: center;
     }
-    /* Pulsing green dot to show the dashboard is live */
     .live-dot {
       display: inline-block;
       width: 7px;
@@ -232,50 +208,22 @@
 
 
   <script>
-    /**
-     * NetWatch Dashboard — polling logic
-     *
-     * The browser runs this JavaScript after loading the page.
-     * fetch() is a modern browser API that makes HTTP requests.
-     * It's asynchronous — it doesn't block the page while waiting
-     * for the server to respond.
-     *
-     * async/await is syntactic sugar over Promises. Instead of
-     * nested .then() callbacks, we can write sequential-looking
-     * code that actually runs asynchronously.
-     */
-
-    // The URL of the API. Change this if running on a different host/port.
     const API_BASE = 'http://localhost:8000';
-
-    // How often to poll the API (milliseconds). 5000ms = 5 seconds.
     const POLL_INTERVAL_MS = 5000;
 
-    /**
-     * Fetch /health and update the DOM with the results.
-     * Called immediately on page load, then every POLL_INTERVAL_MS.
-     */
     async function refreshHealth() {
       const errorBanner = document.getElementById('error-banner');
 
       try {
-        // fetch() makes an HTTP GET request.
-        // "await" pauses here until the response arrives, without
-        // blocking the rest of the browser (page stays responsive).
         const response = await fetch(`${API_BASE}/health`);
-
-        // .json() parses the JSON body into a JavaScript object.
         const data = await response.json();
 
-        // Determine which CSS class to apply based on the value.
-        // CSS classes control the colour (green/red/yellow).
         const statusClass = data.status === 'healthy'  ? 'healthy'
                           : data.status === 'degraded' ? 'degraded'
                           :                               'unknown';
 
         const dbClass = data.database === 'connected' ? 'healthy' : 'degraded';
 
-        // Update each stat field in the DOM.
         setValue('stat-status',      data.status,                       statusClass);
         setValue('stat-database',    data.database,                     dbClass);
         setValue('stat-environment', data.environment,                  '');
@@ -283,45 +231,27 @@
         setValue('stat-python',      data.python_version,               '');
         setValue('stat-version',     data.version ?? '—',               '');
 
-        // Hide the error banner if we previously showed it.
         errorBanner.style.display = 'none';
 
       } catch (err) {
-        // fetch() throws if there's a network error (e.g., API not running).
-        // We show the error banner and mark everything as unreachable.
         const fields = ['stat-status','stat-database','stat-environment',
                         'stat-uptime','stat-python','stat-version'];
         fields.forEach(id => setValue(id, 'unreachable', 'degraded'));
         errorBanner.style.display = 'block';
       }
 
-      // Always update the timestamp regardless of success or failure.
       document.getElementById('last-updated').textContent =
         new Date().toLocaleTimeString();
     }
 
-    /**
-     * Update an element's text content and CSS class.
-     *
-     * @param {string} id        - The element's id attribute
-     * @param {string} text      - The text to display
-     * @param {string} cssClass  - The colour class to apply (healthy/degraded/unknown)
-     */
     function setValue(id, text, cssClass) {
       const el = document.getElementById(id);
       if (!el) return;
       el.textContent = text;
-      // Reset to base class, then add the colour class if provided.
       el.className = 'stat-value' + (cssClass ? ' ' + cssClass : '');
     }
 
-    /**
-     * Convert a number of seconds into a human-readable string.
-     * Examples: "45s", "3m 12s", "1h 23m 45s"
-     *
-     * @param {number} totalSeconds
-     * @returns {string}
-     */
+    // "45s", "3m 12s", "1h 23m 45s"
     function formatUptime(totalSeconds) {
       if (totalSeconds == null || isNaN(totalSeconds)) return '—';
       const h = Math.floor(totalSeconds / 3600);
@@ -332,14 +262,7 @@
       return `${s}s`;
     }
 
-    /**
-     * Escape a value for safe insertion into innerHTML.
-     *
-     * Device fields (hostname, site) are user-supplied via the API — without
-     * escaping, a device named "<img src=x onerror=...>" would execute
-     * JavaScript in every dashboard viewer's browser (stored XSS, FM-A7).
-     * Rule: anything that came from outside this file gets escaped.
-     */
+    // Escape API-supplied text before innerHTML insertion (stored XSS, FM-A7).
     function esc(value) {
       return String(value).replace(/[&<>"']/g, c => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',

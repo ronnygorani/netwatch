@@ -1,19 +1,13 @@
-"""Parsers for CLI output collected over SSH.
+"""Parsers for CLI output collected over SSH. Pure stdlib — no netmiko import.
 
-Pure stdlib — deliberately no netmiko/httpx imports, so these can be
-unit-tested without network dependencies installed. All patterns are
-case-insensitive: real devices disagree about capitalization.
-
-These regexes are scaffolding (design decision D-05): they get replaced by
-NAPALM's structured getters in Phase 4. Until then, every parser returns
-None instead of raising on unrecognized output — a partial metric beats a
-dead poll cycle, and the raw output is stored for post-hoc diagnosis.
+Parsers return None on unrecognized output rather than raising; raw output is
+stored server-side for diagnosis. Scheduled for replacement by NAPALM (Phase 4).
 """
 
 import re
 
-# Cisco IOS: "CPU utilization for five seconds: 7%/0%; one minute: 5%; five minutes: 4%"
-# Prefer the five-minute average (least noisy), then one minute, then anything.
+# "CPU utilization for five seconds: 7%/0%; one minute: 5%; five minutes: 4%"
+# Prefer the five-minute average, then one-minute, then any figure.
 _CPU_FIVE_MIN = re.compile(r"five minutes?:\s*(\d+)%", re.IGNORECASE)
 _CPU_ONE_MIN = re.compile(r"one minute:\s*(\d+)%", re.IGNORECASE)
 _CPU_ANY = re.compile(r"CPU utilization.*?(\d+)%", re.IGNORECASE)

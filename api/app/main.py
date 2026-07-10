@@ -17,16 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
-    """Application factory. Returns a configured FastAPI instance.
-
-    Using a factory instead of a module-level instance keeps tests
-    isolated — each test gets a fresh app with no shared state.
-    """
+    """Application factory — keeps tests isolated from module-level state."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Schema is managed by Alembic (`alembic upgrade head`), run as a
-        # deploy step — the app itself never mutates the schema at startup.
+        # Schema is managed by Alembic as a deploy step, never at startup.
         logger.info(
             "NetWatch API starting | env=%s | version=%s",
             settings.environment,
@@ -49,8 +44,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Browsers block cross-origin responses without this — the dashboard is
-    # served from a different origin (file:// or a static host) than the API.
+    # Dashboard is served from a different origin than the API.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
