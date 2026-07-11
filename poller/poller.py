@@ -15,6 +15,7 @@ logger = logging.getLogger("poller")
 API_BASE = os.getenv("API_BASE_URL", "http://api:8000")
 API_KEY = os.getenv("NETWATCH_API_KEY", "")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "60"))
+POLLER_NAME = os.getenv("POLLER_NAME", "poller")
 SSH_USER = os.getenv("NETMIKO_USERNAME", "")
 SSH_PASS = os.getenv("NETMIKO_PASSWORD", "")
 
@@ -31,6 +32,23 @@ def fetch_devices(client: httpx.Client) -> list[dict]:
 def post_metric(client: httpx.Client, payload: dict) -> None:
     resp = client.post("/metrics", json=payload)
     resp.raise_for_status()
+
+
+def post_heartbeat(
+    client: httpx.Client, devices_polled: int, failures: int, started: float
+) -> None:
+    # Best effort: a failed heartbeat must never break the cycle.
+    payload = {
+        "name": POLLER_NAME,
+        "devices_polled": devices_polled,
+        "failures": failures,
+        "cycle_seconds": round(time.monotonic() - started, 2),
+        "interval_seconds": POLL_INTERVAL,
+    }
+    try:
+        client.post("/poller/heartbeat", json=payload).raise_for_status()
+    except Exception as exc:
+        logger.warning("Heartbeat post failed: %s", exc)
 
 
 def poll_device(device: dict) -> dict:
@@ -71,6 +89,8 @@ def poll_device(device: dict) -> dict:
 
 def run_poll_cycle() -> None:
     logger.info("Starting poll cycle")
+    started = time.monotonic()
+    failures = 0
 
     # One client per cycle for connection reuse; key authenticates all requests.
     with httpx.Client(base_url=API_BASE, timeout=10, headers={"X-API-Key": API_KEY}) as client:
@@ -78,23 +98,29 @@ def run_poll_cycle() -> None:
             devices = fetch_devices(client)
         except Exception as exc:
             logger.error("Could not fetch device list: %s", exc)
+            post_heartbeat(client, devices_polled=0, failures=1, started=started)
             return
 
         logger.info("Polling %d active device(s)", len(devices))
         for device in devices:
             logger.info("Polling %s (%s)", device["hostname"], device["ip_address"])
             metric = poll_device(device)
+            if metric["status"] != "up":
+                failures += 1
             try:
                 post_metric(client, metric)
                 logger.info(
-                    "  %s → status=%s cpu=%s%% mem=%s%%",
+                    "  %s status=%s cpu=%s%% mem=%s%%",
                     device["hostname"],
                     metric["status"],
                     metric.get("cpu_percent", "n/a"),
                     metric.get("memory_percent", "n/a"),
                 )
             except Exception as exc:
+                failures += 1
                 logger.error("Failed to post metric for %s: %s", device["hostname"], exc)
+
+        post_heartbeat(client, devices_polled=len(devices), failures=failures, started=started)
 
     logger.info("Poll cycle complete")
 

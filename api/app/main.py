@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.config import settings
-from app.models import Device, Metric  # noqa: F401 — imported to register with Base
-from app.routers import devices, health, metrics
+from app.models import Device, Metric, PollerHeartbeat  # noqa: F401 — registers with Base
+from app.routers import devices, health, metrics, poller
 
 logging.basicConfig(
     level=settings.log_level.upper(),
@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(devices.router)
     app.include_router(metrics.router)
+    app.include_router(poller.router)
 
     return app
 
