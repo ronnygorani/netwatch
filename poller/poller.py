@@ -5,6 +5,7 @@ import time
 import httpx
 from netmiko import ConnectHandler, NetmikoAuthenticationException, NetmikoTimeoutException
 from parsers import parse_cpu, parse_memory, parse_uptime_seconds
+from runner import poll_all
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -16,6 +17,9 @@ API_BASE = os.getenv("API_BASE_URL", "http://api:8000")
 API_KEY = os.getenv("NETWATCH_API_KEY", "")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "60"))
 POLLER_NAME = os.getenv("POLLER_NAME", "poller")
+# Concurrent SSH sessions per cycle. Bounds resource use on the poller host,
+# not the devices (one session each).
+MAX_WORKERS = int(os.getenv("POLLER_MAX_WORKERS", "10"))
 SSH_USER = os.getenv("NETMIKO_USERNAME", "")
 SSH_PASS = os.getenv("NETMIKO_PASSWORD", "")
 
@@ -52,6 +56,7 @@ def post_heartbeat(
 
 
 def poll_device(device: dict) -> dict:
+    logger.info("Polling %s (%s)", device["hostname"], device["ip_address"])
     connection_params = {
         "device_type": device["device_type"],
         "host": device["ip_address"],
@@ -101,10 +106,10 @@ def run_poll_cycle() -> None:
             post_heartbeat(client, devices_polled=0, failures=1, started=started)
             return
 
-        logger.info("Polling %d active device(s)", len(devices))
-        for device in devices:
-            logger.info("Polling %s (%s)", device["hostname"], device["ip_address"])
-            metric = poll_device(device)
+        logger.info("Polling %d active device(s), %d workers", len(devices), MAX_WORKERS)
+        # SSH in parallel (the slow part), then post results from this thread.
+        metrics = poll_all(devices, poll_device, MAX_WORKERS)
+        for device, metric in zip(devices, metrics, strict=True):
             if metric["status"] != "up":
                 failures += 1
             try:
