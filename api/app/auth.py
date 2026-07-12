@@ -11,8 +11,10 @@ from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models.api_key import ApiKey
+from app.rate_limit import limiter
 
 # auto_error=False so a missing header returns our 401, not FastAPI's generic 403.
 _header_scheme = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -54,6 +56,12 @@ def require_scope(scope: str):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"API key '{record.name}' lacks required scope '{scope}'",
+            )
+        # Keyed by hash, not name: unique per credential.
+        if not limiter.allow(record.key_hash, settings.rate_limit_per_minute):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded for API key '{record.name}'",
             )
         # Persisted by the route's commit — tracks successful use only.
         record.last_used_at = datetime.now(UTC)

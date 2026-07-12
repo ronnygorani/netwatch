@@ -1,11 +1,13 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.auth import require_scope
+from app.config import settings
 from app.database import get_db
 from app.models.api_key import ApiKey
+from app.models.metric import Metric
 from app.models.poller_heartbeat import PollerHeartbeat
 from app.schemas.heartbeat import HeartbeatCreate, HeartbeatResponse
 
@@ -27,6 +29,13 @@ def record_heartbeat(
     heartbeat.failures = payload.failures
     heartbeat.cycle_seconds = payload.cycle_seconds
     heartbeat.interval_seconds = payload.interval_seconds
+
+    # Retention rides the heartbeat cadence: one bounded, indexed DELETE per
+    # cycle instead of a scheduler we don't have yet (FM-D4; revisit at P6 jobs).
+    if settings.metric_retention_days > 0:
+        cutoff = datetime.now(UTC) - timedelta(days=settings.metric_retention_days)
+        db.query(Metric).filter(Metric.collected_at < cutoff).delete()
+
     db.commit()
     db.refresh(heartbeat)
     return heartbeat

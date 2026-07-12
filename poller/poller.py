@@ -28,13 +28,21 @@ RAW_OUTPUT_LIMIT = 8_000
 
 
 def fetch_devices(client: httpx.Client) -> list[dict]:
-    resp = client.get("/devices")
-    resp.raise_for_status()
-    return [d for d in resp.json() if d["is_active"]]
+    devices: list[dict] = []
+    offset = 0
+    while True:
+        resp = client.get("/v1/devices", params={"limit": 500, "offset": offset})
+        resp.raise_for_status()
+        page = resp.json()
+        devices.extend(page["items"])
+        offset += len(page["items"])
+        if offset >= page["total"] or not page["items"]:
+            break
+    return [d for d in devices if d["is_active"]]
 
 
 def post_metric(client: httpx.Client, payload: dict) -> None:
-    resp = client.post("/metrics", json=payload)
+    resp = client.post("/v1/metrics", json=payload)
     resp.raise_for_status()
 
 
@@ -50,7 +58,7 @@ def post_heartbeat(
         "interval_seconds": POLL_INTERVAL,
     }
     try:
-        client.post("/poller/heartbeat", json=payload).raise_for_status()
+        client.post("/v1/poller/heartbeat", json=payload).raise_for_status()
     except Exception as exc:
         logger.warning("Heartbeat post failed: %s", exc)
 

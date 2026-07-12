@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # Comma-separated allowed origins; "*" is dev-only.
     cors_origins: str = "*"
 
+    # Writes per key per minute. In-memory limiter: per-process until Redis (P6).
+    rate_limit_per_minute: int = 120
+
+    # Metrics older than this are purged opportunistically; 0 disables.
+    metric_retention_days: int = 30
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

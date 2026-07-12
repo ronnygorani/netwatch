@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -7,18 +7,26 @@ from app.database import get_db
 from app.models.api_key import ApiKey
 from app.models.device import Device
 from app.schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
+from app.schemas.pagination import Page
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 # Writes require devices:write; reads stay open until human auth (Phase 6).
 
 
-@router.get("", response_model=list[DeviceResponse])
-def list_devices(site: str | None = None, db: Session = Depends(get_db)):
+@router.get("", response_model=Page[DeviceResponse])
+def list_devices(
+    site: str | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
     query = db.query(Device)
     if site:
         query = query.filter(Device.site == site)
-    return query.order_by(Device.site, Device.hostname).all()
+    total = query.count()
+    items = query.order_by(Device.site, Device.hostname).offset(offset).limit(limit).all()
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/{device_id}", response_model=DeviceResponse)
