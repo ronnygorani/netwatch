@@ -173,6 +173,11 @@
       <span class="stat-label">API Version</span>
       <span class="stat-value" id="stat-version">—</span>
     </div>
+
+    <div class="stat">
+      <span class="stat-label">Poller</span>
+      <span class="stat-value" id="stat-poller">—</span>
+    </div>
   </div>
 
   <!-- ── Error Banner (hidden until fetch fails) ──────────── -->
@@ -262,6 +267,25 @@
       return `${s}s`;
     }
 
+    // Stale = no heartbeat for over 2x the poll interval (FM-P4).
+    async function refreshPoller() {
+      try {
+        const resp = await fetch(`${API_BASE}/poller/status`);
+        const pollers = await resp.json();
+        if (!pollers.length) {
+          setValue('stat-poller', 'no heartbeat yet', 'unknown');
+          return;
+        }
+        const p = pollers[0];
+        const ageSec = Math.round((Date.now() - new Date(p.last_seen_at).getTime()) / 1000);
+        const stale = ageSec > p.interval_seconds * 2;
+        const label = `${p.devices_polled} devices, ${p.failures} failed, ${ageSec}s ago`;
+        setValue('stat-poller', stale ? `stale: ${label}` : label, stale ? 'degraded' : 'healthy');
+      } catch {
+        setValue('stat-poller', 'unreachable', 'degraded');
+      }
+    }
+
     // Escape API-supplied text before innerHTML insertion (stored XSS, FM-A7).
     function esc(value) {
       return String(value).replace(/[&<>"']/g, c => ({
@@ -311,8 +335,10 @@
     // ── Start ───────────────────────────────────────────────
     refreshHealth();
     refreshDevices();
+    refreshPoller();
     setInterval(refreshHealth, POLL_INTERVAL_MS);
     setInterval(refreshDevices, POLL_INTERVAL_MS);
+    setInterval(refreshPoller, POLL_INTERVAL_MS);
   </script>
 
 </body>
