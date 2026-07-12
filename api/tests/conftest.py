@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -14,25 +15,33 @@ from app.models.api_key import ApiKey
 
 @pytest.fixture
 def test_db():
-    """Fresh in-memory database per test — no shared state, any run order.
+    """Fresh database per test: no shared state, any run order.
 
+    Local default is in-memory SQLite (fast path). CI sets TEST_DATABASE_URL
+    to the real Postgres service so tests exercise the production engine.
     StaticPool is required for in-memory SQLite: every new connection would
     otherwise get its own empty database.
     """
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    url = os.getenv("TEST_DATABASE_URL", "sqlite:///:memory:")
+    if url.startswith("sqlite"):
+        engine = create_engine(
+            url,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
 
-    # SQLite defaults FKs off; enable so CASCADE behavior matches Postgres.
-    @event.listens_for(engine, "connect")
-    def _enable_sqlite_fks(dbapi_connection, _):
-        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+        # SQLite defaults FKs off; enable so CASCADE behavior matches Postgres.
+        @event.listens_for(engine, "connect")
+        def _enable_sqlite_fks(dbapi_connection, _):
+            dbapi_connection.execute("PRAGMA foreign_keys=ON")
+    else:
+        engine = create_engine(url)
 
-    session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
     yield SimpleNamespace(engine=engine, session_factory=session_factory)
+    Base.metadata.drop_all(bind=engine)
     engine.dispose()
 
 
@@ -80,7 +89,7 @@ def create_device(client, auth_headers):
 
     def _create(hostname="SW-01", ip_address="10.0.0.1", site="HQ", **extra):
         payload = {"hostname": hostname, "ip_address": ip_address, "site": site, **extra}
-        resp = client.post("/devices", json=payload, headers=auth_headers)
+        resp = client.post("/v1/devices", json=payload, headers=auth_headers)
         assert resp.status_code == 201, resp.text
         return resp.json()
 

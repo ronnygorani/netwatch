@@ -9,6 +9,7 @@ from app.models.api_key import ApiKey
 from app.models.device import Device
 from app.models.metric import Metric
 from app.schemas.metric import MetricCreate, MetricResponse
+from app.schemas.pagination import Page
 
 router = APIRouter(tags=["metrics"])
 
@@ -36,25 +37,23 @@ def ingest_metric(
     return metric
 
 
-@router.get("/devices/{device_id}/metrics", response_model=list[MetricResponse])
+@router.get("/devices/{device_id}/metrics", response_model=Page[MetricResponse])
 def get_device_metrics(
     device_id: int,
     limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
-    return (
-        db.query(Metric)
-        .filter(Metric.device_id == device_id)
-        .order_by(Metric.collected_at.desc())
-        .limit(limit)
-        .all()
-    )
+    query = db.query(Metric).filter(Metric.device_id == device_id)
+    total = query.count()
+    items = query.order_by(Metric.collected_at.desc()).offset(offset).limit(limit).all()
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
-@router.get("/metrics/latest", response_model=list[MetricResponse])
+@router.get("/metrics/latest", response_model=Page[MetricResponse])
 def get_latest_metrics(db: Session = Depends(get_db)):
     subquery = (
         db.query(
@@ -64,7 +63,7 @@ def get_latest_metrics(db: Session = Depends(get_db)):
         .group_by(Metric.device_id)
         .subquery()
     )
-    return (
+    items = (
         db.query(Metric)
         .join(
             subquery,
@@ -73,3 +72,5 @@ def get_latest_metrics(db: Session = Depends(get_db)):
         )
         .all()
     )
+    # Bounded by device count; envelope kept for consistency, not paged.
+    return Page(items=items, total=len(items), limit=len(items) or 1, offset=0)

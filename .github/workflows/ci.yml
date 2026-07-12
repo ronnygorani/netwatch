@@ -65,6 +65,8 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
       ENVIRONMENT: testing
+      # Tests hit the real Postgres service; local runs default to SQLite.
+      TEST_DATABASE_URL: postgresql+psycopg2://netwatch:testpassword@localhost:5432/netwatch_test
 
     steps:
       - uses: actions/checkout@v7

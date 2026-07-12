@@ -1,8 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app import __version__
 from app.config import settings
@@ -35,8 +36,9 @@ def create_app() -> FastAPI:
         description=(
             "Unified REST API for the NetWatch network automation platform.\n\n"
             "Current modules:\n"
-            "- Device inventory → /devices\n"
-            "- Health metrics ingestion and queries → /metrics\n"
+            "- Device inventory: /v1/devices\n"
+            "- Health metrics ingestion and queries: /v1/metrics\n"
+            "- Collector liveness: /v1/poller\n"
         ),
         version=__version__,
         docs_url="/docs",
@@ -52,10 +54,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # /health stays unversioned: it is infrastructure (probes), not API surface.
     app.include_router(health.router)
-    app.include_router(devices.router)
-    app.include_router(metrics.router)
-    app.include_router(poller.router)
+    app.include_router(devices.router, prefix="/v1")
+    app.include_router(metrics.router, prefix="/v1")
+    app.include_router(poller.router, prefix="/v1")
+
+    # Legacy unversioned paths: 308 preserves method and body, unlike 301.
+    # Remove after one phase (CONTRACTS section 1).
+    legacy_prefixes = ("/devices", "/metrics", "/poller")
+
+    @app.middleware("http")
+    async def redirect_legacy_paths(request: Request, call_next):
+        path = request.url.path
+        if path.startswith(legacy_prefixes):
+            url = request.url.replace(path=f"/v1{path}")
+            return RedirectResponse(str(url), status_code=308)
+        return await call_next(request)
 
     return app
 
