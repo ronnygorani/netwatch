@@ -3,7 +3,7 @@
 # Pinned to exact versions for reproducible builds.
 
 fastapi==0.139.0
-uvicorn[standard]==0.34.0
+uvicorn[standard]==0.51.0
 sqlalchemy==2.0.51
 alembic==1.18.5
 psycopg2-binary==2.9.12
