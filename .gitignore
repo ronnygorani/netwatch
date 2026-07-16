@@ -48,3 +48,6 @@ CLAUDE.md
 
 # Test databases
 *.db
+
+# ContainerLab runtime state (TLS keys, node flash) — topology YAML is the source
+lab/clab-*/
