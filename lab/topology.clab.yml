@@ -1,0 +1,30 @@
+# NetWatch virtual lab: one spine, two leaves (Arista cEOS).
+# Deploy from WSL2 Ubuntu:
+#   sudo containerlab deploy -t /mnt/c/Users/ronny/Projects/NetWatch/lab/topology.clab.yml
+# Then connect the poller to the lab mgmt network:
+#   docker network connect netwatch-lab netwatch-poller
+name: netwatch
+
+mgmt:
+  network: netwatch-lab
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  defaults:
+    kind: arista_ceos
+    image: ceos:4.35.4M
+
+  nodes:
+    spine1:
+      mgmt-ipv4: 172.20.20.11
+      startup-config: configs/spine1.cfg
+    leaf1:
+      mgmt-ipv4: 172.20.20.12
+      startup-config: configs/leaf1.cfg
+    leaf2:
+      mgmt-ipv4: 172.20.20.13
+      startup-config: configs/leaf2.cfg
+
+  links:
+    - endpoints: ["leaf1:eth1", "spine1:eth1"]
+    - endpoints: ["leaf2:eth1", "spine1:eth2"]
