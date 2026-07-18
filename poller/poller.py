@@ -1,10 +1,13 @@
+import json
 import logging
 import os
 import time
 
 import httpx
+from napalm import get_network_driver
+from napalm.base.exceptions import ConnectionException
 from netmiko import ConnectHandler, NetmikoAuthenticationException, NetmikoTimeoutException
-from parsers import parse_cpu, parse_memory, parse_uptime_seconds
+from parsers import metrics_from_napalm, parse_cpu, parse_memory, parse_uptime_seconds
 from runner import poll_all
 
 logging.basicConfig(
@@ -25,6 +28,15 @@ SSH_PASS = os.getenv("NETMIKO_PASSWORD", "")
 
 # Keep comfortably under the API's 10_000-char schema cap on raw_output.
 RAW_OUTPUT_LIMIT = 8_000
+
+# device_type -> NAPALM driver. Arista uses eAPI (HTTPS); Cisco drivers use SSH.
+NAPALM_DRIVERS = {
+    "arista_eos": "eos",
+    "cisco_ios": "ios",
+    "cisco_xe": "ios",
+    "cisco_nxos": "nxos",
+    "juniper_junos": "junos",
+}
 
 
 def fetch_devices(client: httpx.Client) -> list[dict]:
@@ -63,8 +75,53 @@ def post_heartbeat(
         logger.warning("Heartbeat post failed: %s", exc)
 
 
+def poll_device_napalm(device: dict) -> dict:
+    driver_name = NAPALM_DRIVERS[device["device_type"]]
+    driver = get_network_driver(driver_name)
+    # SSH-based drivers honor the device's port; eos uses eAPI on its default.
+    optional_args = {"port": device["port"]} if driver_name != "eos" else {}
+    conn = driver(
+        hostname=device["ip_address"],
+        username=SSH_USER,
+        password=SSH_PASS,
+        timeout=15,
+        optional_args=optional_args,
+    )
+    conn.open()
+    try:
+        facts = conn.get_facts()
+        try:
+            environment = conn.get_environment()
+        except Exception:
+            # Virtual platforms may lack sensors; facts alone still give uptime.
+            environment = {}
+    finally:
+        conn.close()
+
+    raw = json.dumps({"facts": facts, "environment": environment}, default=str)
+    return {
+        "device_id": device["id"],
+        "status": "up",
+        **metrics_from_napalm(facts, environment),
+        "raw_output": raw[:RAW_OUTPUT_LIMIT],
+    }
+
+
 def poll_device(device: dict) -> dict:
     logger.info("Polling %s (%s)", device["hostname"], device["ip_address"])
+    if device["device_type"] in NAPALM_DRIVERS:
+        try:
+            return poll_device_napalm(device)
+        except ConnectionException:
+            logger.warning(
+                "NAPALM connection failed for %s, falling back to SSH", device["hostname"]
+            )
+        except Exception as exc:
+            logger.warning("NAPALM error for %s (%s), falling back to SSH", device["hostname"], exc)
+    return poll_device_netmiko(device)
+
+
+def poll_device_netmiko(device: dict) -> dict:
     connection_params = {
         "device_type": device["device_type"],
         "host": device["ip_address"],

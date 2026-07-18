@@ -6,7 +6,7 @@ parsing bug found in the field becomes a regression case.
 """
 
 import pytest
-from parsers import parse_cpu, parse_memory, parse_uptime_seconds
+from parsers import metrics_from_napalm, parse_cpu, parse_memory, parse_uptime_seconds
 
 
 @pytest.mark.parametrize(
@@ -64,3 +64,30 @@ def test_parse_memory(output, expected):
 )
 def test_parse_uptime_seconds(output, expected):
     assert parse_uptime_seconds(output) == expected
+
+
+def test_metrics_from_napalm_full_data():
+    """Typical NAPALM getter shapes (as returned by the eos driver)."""
+    facts = {"uptime": 3605.4, "vendor": "Arista", "hostname": "leaf1"}
+    environment = {
+        "cpu": {0: {"%usage": 4.0}, 1: {"%usage": 6.0}},
+        "memory": {"available_ram": 4_000_000, "used_ram": 1_000_000},
+    }
+    result = metrics_from_napalm(facts, environment)
+    assert result == {"cpu_percent": 5.0, "memory_percent": 25.0, "uptime_seconds": 3605}
+
+
+def test_metrics_from_napalm_missing_sensors():
+    """Virtual platforms often lack environment data; uptime must survive."""
+    result = metrics_from_napalm({"uptime": 120}, {})
+    assert result == {"cpu_percent": None, "memory_percent": None, "uptime_seconds": 120}
+
+
+def test_metrics_from_napalm_empty_everything():
+    result = metrics_from_napalm({}, {})
+    assert result == {"cpu_percent": None, "memory_percent": None, "uptime_seconds": None}
+
+
+def test_metrics_from_napalm_zero_available_ram_no_crash():
+    result = metrics_from_napalm({}, {"memory": {"available_ram": 0, "used_ram": 0}})
+    assert result["memory_percent"] is None

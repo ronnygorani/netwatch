@@ -50,3 +50,30 @@ def parse_uptime_seconds(output: str) -> int | None:
         if (m := pattern.search(output))
     )
     return total or None
+
+
+def metrics_from_napalm(facts: dict, environment: dict) -> dict:
+    """Map NAPALM get_facts/get_environment output to metric fields.
+
+    Tolerates missing keys: virtual platforms often lack sensors, and a
+    partial metric beats a failed poll.
+    """
+    uptime = (facts or {}).get("uptime")
+
+    cpus = (environment or {}).get("cpu") or {}
+    usages = [
+        core["%usage"]
+        for core in cpus.values()
+        if isinstance(core, dict) and core.get("%usage") is not None
+    ]
+    cpu = round(sum(usages) / len(usages), 1) if usages else None
+
+    memory = (environment or {}).get("memory") or {}
+    available, used = memory.get("available_ram"), memory.get("used_ram")
+    memory_pct = round(used / available * 100, 1) if available and used is not None else None
+
+    return {
+        "cpu_percent": cpu,
+        "memory_percent": memory_pct,
+        "uptime_seconds": int(uptime) if uptime is not None else None,
+    }
