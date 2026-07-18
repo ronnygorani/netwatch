@@ -1,71 +1,101 @@
-# NetWatch — Network Automation Platform
+# NetWatch
 
-A centralized network automation platform for multi-site Cisco environments, built as a portfolio project targeting DevOps, Platform, and Solution Engineering roles.
+Network monitoring and automation platform for multi-site, multi-vendor networks.
 
-## What it does
+[![CI](https://github.com/ronnygorani/netwatch/actions/workflows/ci.yml/badge.svg)](https://github.com/ronnygorani/netwatch/actions/workflows/ci.yml)
 
-NetWatch gives network teams a single platform to monitor device health, manage configurations, and control changes across every site — with a full audit trail for every action.
+NetWatch keeps a central inventory of network devices, polls them over SSH on a
+schedule, and serves health data through a single versioned REST API with a live
+dashboard on top. It ships with a reproducible three-switch Arista cEOS lab so the
+whole platform can be run and demonstrated on one machine.
 
-- **Device Inventory** — centralised database of all switches, routers, and firewalls across all sites
-- **Health Poller** — SSHes into each device on a schedule via Netmiko, collects CPU, memory, and uptime, stores time-series metrics
-- **Nautobot Source of Truth** *(Phase 3)* — stand up Nautobot as the single SoT; seed sites and devices; FastAPI reads inventory via `pynautobot`; dashboard shows live SoT data
-- **Ansible Automation** *(Phase 4)* — Ansible pulls dynamic inventory from Nautobot, runs backup and fact-gathering playbooks; FastAPI triggers runs via `ansible-runner` with job-status tracking
+## Features
 
-All modules communicate exclusively through a single FastAPI REST API backed by PostgreSQL, surfaced via a live HTML dashboard.
+- Device inventory with full CRUD over a versioned REST API (`/v1`)
+- Scheduled SSH health polling (CPU, memory, uptime) with a bounded concurrent
+  worker pool; one slow or dead device never stalls a cycle
+- Scoped API key authentication for services (keys stored as SHA-256 hashes only)
+- Collector heartbeat with staleness detection: a dead poller shows up red on the
+  dashboard instead of leaving stale data that looks healthy
+- Pagination, per-key rate limiting, and automatic metric retention
+- Database schema managed entirely by Alembic migrations
+- Single-file dashboard with no build step
+- Lab topology defined as code with ContainerLab and Arista cEOS
 
-## Stack
+## Architecture
 
-| Layer | Technology |
-|---|---|
-| Network automation | Python, Netmiko |
-| API | Python, FastAPI, SQLAlchemy |
-| Database | PostgreSQL |
-| Containers | Docker, Docker Compose |
-| Orchestration | Kubernetes on AWS EKS |
-| Infrastructure as Code | Terraform |
-| CI/CD | GitHub Actions |
-| Dashboard | Vanilla HTML/JS |
+Three services run under Docker Compose: a PostgreSQL database, the FastAPI
+control plane, and the SSH poller. Every component communicates exclusively
+through the API; nothing else touches the database. Configuration enters only
+through environment variables, so the same images run in development, CI, and
+production.
 
-## API Endpoints
+## Tech stack
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | API and database status |
-| `GET` | `/devices` | List all devices (filter by `?site=`) |
-| `POST` | `/devices` | Add a device to the inventory |
-| `PATCH` | `/devices/{id}` | Update a device |
-| `DELETE` | `/devices/{id}` | Remove a device |
-| `POST` | `/metrics` | Ingest a metric snapshot (used by poller) |
-| `GET` | `/metrics/latest` | Latest metric for every device |
-| `GET` | `/devices/{id}/metrics` | Full metric history for one device |
-| `GET` | `/docs` | Auto-generated interactive API docs |
+Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, PostgreSQL 16, Netmiko,
+Docker Compose, ContainerLab with Arista cEOS, GitHub Actions.
 
-## Getting Started
+## Quick start
+
+Requires Docker with the compose plugin.
 
 ```bash
 git clone https://github.com/ronnygorani/netwatch.git
 cd netwatch
+cp .env.example .env        # set a real POSTGRES_PASSWORD
 
-cp .env.example .env
-# fill in your SSH credentials and Postgres password
+docker compose up -d --build
 
-docker compose up --build
+# Mint a key for the poller, paste it into .env as NETWATCH_API_KEY, then:
+docker compose exec api python -m app.create_api_key poller "metrics:write"
+docker compose up -d poller
 ```
 
-API live at `localhost:8000` — interactive docs at `localhost:8000/docs`
+The API is now at `http://localhost:8000` (interactive docs at `/docs`). Open
+`dashboard/index.html` in a browser for the live dashboard.
 
-## Build Phases
+To run the virtual switch lab, see [lab/README.md](lab/README.md).
 
-Full architecture, technology rationale, and roadmap with acceptance criteria live in
-the **[design document](docs/DESIGN.md)** — the authoritative plan.
+## API overview
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | FastAPI `/health`, PostgreSQL, Dockerfile, Docker Compose, GitHub Actions CI | Completed |
-| 2 | Device inventory API, Netmiko poller, live dashboard, 16 passing tests | Completed |
-| 3 | Production hardening — auth, Alembic migrations, concurrent polling, pagination, observability | Planned |
-| 4 | Virtual lab — ContainerLab + Arista cEOS topology, multi-vendor polling via NAPALM | Planned |
-| 5 | Nautobot Source of Truth — inventory moves to Nautobot, webhooks, `pynautobot` | Planned |
-| 6 | Ansible & change workflow — dynamic inventory, job queue, propose → approve → execute → validate → audit | Planned |
-| 7 | Differentiators — config drift detection, gNMI streaming telemetry, self-healing demo | Planned |
-| 8 | Cloud — Kubernetes manifests, Terraform AWS (EKS, ECR, VPC), GitHub Actions deploy | Planned |
+| Method | Endpoint                    | Description                    | Auth           |
+|--------|-----------------------------|--------------------------------|----------------|
+| GET    | `/health`                   | Service and database status    | none           |
+| GET    | `/v1/devices`               | List devices (paginated)       | none           |
+| POST   | `/v1/devices`               | Add a device                   | `devices:write`|
+| PATCH  | `/v1/devices/{id}`          | Update a device                | `devices:write`|
+| DELETE | `/v1/devices/{id}`          | Remove a device                | `devices:write`|
+| GET    | `/v1/devices/{id}/metrics`  | Metric history (paginated)     | none           |
+| POST   | `/v1/metrics`               | Ingest a metric                | `metrics:write`|
+| GET    | `/v1/metrics/latest`        | Latest metric per device       | none           |
+| POST   | `/v1/poller/heartbeat`      | Collector liveness report      | `metrics:write`|
+| GET    | `/v1/poller/status`         | Collector status               | none           |
+
+Authenticated endpoints take an `X-API-Key` header. List endpoints return
+`{items, total, limit, offset}` envelopes. Full request and response schemas are
+in the interactive docs at `/docs`.
+
+## Development
+
+```bash
+ruff check api/ poller/ && ruff format api/ poller/ --check   # lint
+cd api && pytest tests/ -q                                    # API tests (SQLite)
+cd poller && pytest tests/ -q                                 # parser and runner tests
+```
+
+Set `TEST_DATABASE_URL` to run the API tests against PostgreSQL; CI does this on
+every push, along with an Alembic upgrade/downgrade/upgrade cycle and a Docker
+image build.
+
+## Roadmap
+
+| Phase | Scope                                                              | Status      |
+|-------|--------------------------------------------------------------------|-------------|
+| 1     | API foundation, PostgreSQL, Docker, CI                             | Done        |
+| 2     | Device inventory, SSH poller, dashboard                            | Done        |
+| 3     | Auth, migrations, concurrency, versioning, rate limits, retention  | Done        |
+| 4     | ContainerLab cEOS lab, multi-vendor polling via NAPALM             | In progress |
+| 5     | Nautobot as the source of truth                                    | Planned     |
+| 6     | Ansible execution and a change workflow with approvals             | Planned     |
+| 7     | Config drift detection, streaming telemetry                        | Planned     |
+| 8     | Kubernetes, Terraform, AWS deployment                              | Planned     |
