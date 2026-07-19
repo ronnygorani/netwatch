@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Metrics older than this are purged opportunistically; 0 disables.
     metric_retention_days: int = 30
 
+    # Source of truth. Empty token disables SoT sync (503 from /v1/sot/sync).
+    nautobot_url: str = "http://nautobot:8080"
+    nautobot_token: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

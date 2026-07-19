@@ -163,7 +163,17 @@ def run_poll_cycle() -> None:
     failures = 0
 
     # One client per cycle for connection reuse; key authenticates all requests.
-    with httpx.Client(base_url=API_BASE, timeout=10, headers={"X-API-Key": API_KEY}) as client:
+    with httpx.Client(base_url=API_BASE, timeout=30, headers={"X-API-Key": API_KEY}) as client:
+        # Refresh the device cache from the source of truth first, best effort.
+        try:
+            resp = client.post("/v1/sot/sync")
+            if resp.status_code == 200:
+                logger.info("SoT sync: %s", resp.json())
+            else:
+                logger.warning("SoT sync skipped: %s %s", resp.status_code, resp.text[:120])
+        except Exception as exc:
+            logger.warning("SoT sync failed: %s", exc)
+
         try:
             devices = fetch_devices(client)
         except Exception as exc:
