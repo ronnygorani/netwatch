@@ -20,14 +20,14 @@ SWITCHES = {
 }
 
 
-def load_token() -> str:
-    if token := os.getenv("NAUTOBOT_TOKEN"):
-        return token
+def load_env_value(name: str) -> str:
+    if value := os.getenv(name):
+        return value
     with open(os.path.join(os.path.dirname(__file__), "..", ".env")) as f:
         for line in f:
-            if line.startswith("NAUTOBOT_TOKEN="):
+            if line.startswith(f"{name}="):
                 return line.split("=", 1)[1].strip()
-    sys.exit("NAUTOBOT_TOKEN not found in environment or .env")
+    sys.exit(f"{name} not found in environment or .env")
 
 
 class Nautobot:
@@ -58,7 +58,7 @@ class Nautobot:
 
 
 def main() -> None:
-    nb = Nautobot(NAUTOBOT_URL, load_token())
+    nb = Nautobot(NAUTOBOT_URL, load_env_value("NAUTOBOT_TOKEN"))
     active = {"name": "Active"}
 
     print("Structural objects:")
@@ -126,6 +126,23 @@ def main() -> None:
         )
         nb.patch("dcim/devices", device["id"], {"primary_ip4": ip["id"]})
         print(f"  {hostname} ready: {address}")
+
+    print("Webhook:")
+    nb.get_or_create(
+        "extras/webhooks",
+        {"name": "netwatch-sync"},
+        {
+            "name": "netwatch-sync",
+            "content_types": ["dcim.device"],
+            "type_create": True,
+            "type_update": True,
+            "type_delete": True,
+            "payload_url": "http://api.netwatch.internal:8000/v1/webhooks/nautobot",
+            "http_method": "POST",
+            "http_content_type": "application/json",
+            "secret": load_env_value("NAUTOBOT_WEBHOOK_SECRET"),
+        },
+    )
 
     print("Seed complete.")
 

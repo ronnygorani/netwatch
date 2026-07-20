@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # Source of truth. Empty token disables SoT sync (503 from /v1/sot/sync).
     nautobot_url: str = "http://nautobot:8080"
     nautobot_token: str = ""
+    # Shared secret for verifying Nautobot webhook signatures; empty disables.
+    nautobot_webhook_secret: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

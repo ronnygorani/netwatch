@@ -7,6 +7,7 @@ nautobot_id (manual/demo devices) are never touched.
 """
 
 import logging
+from datetime import UTC, datetime
 from typing import get_args
 
 import httpx
@@ -19,6 +20,9 @@ from app.schemas.device import DeviceType
 logger = logging.getLogger(__name__)
 
 SUPPORTED_DRIVERS = set(get_args(DeviceType))
+
+# Per-process record of the most recent successful sync, for /v1/sot/status.
+last_sync: dict = {"last_sync_at": None, "last_counts": None}
 
 
 def fetch_nautobot_devices() -> list[dict]:
@@ -89,3 +93,14 @@ def sync_devices(db: Session, mapped: list[dict]) -> dict:
 
     db.commit()
     return {"created": created, "updated": updated, "deactivated": deactivated}
+
+
+def full_sync(db: Session) -> dict:
+    """Fetch from the SoT, reconcile the cache, record the outcome."""
+    nb_devices = fetch_nautobot_devices()
+    mapped = [m for d in nb_devices if (m := map_nautobot_device(d))]
+    counts = sync_devices(db, mapped)
+    counts["skipped"] = len(nb_devices) - len(mapped)
+    last_sync["last_sync_at"] = datetime.now(UTC).isoformat()
+    last_sync["last_counts"] = counts
+    return counts

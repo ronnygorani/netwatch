@@ -49,7 +49,10 @@ services:
       retries: 3
       start_period: 20s
     networks:
-      - netwatch-net
+      netwatch-net:
+        # Dotted alias: Nautobot's webhook URL validator rejects bare hostnames.
+        aliases:
+          - api.netwatch.internal
 
   poller:
     build:
@@ -109,7 +112,7 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
-    environment:
+    environment: &nautobot-env
       NAUTOBOT_DB_HOST: nautobot-db
       NAUTOBOT_DB_USER: nautobot
       NAUTOBOT_DB_PASSWORD: ${NAUTOBOT_DB_PASSWORD}
@@ -126,6 +129,19 @@ services:
       nautobot-db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+    networks:
+      - netwatch-net
+
+  # Dispatches Nautobot background work, including webhook deliveries.
+  nautobot-worker:
+    image: networktocode/nautobot:2.4-py3.12
+    container_name: netwatch-nautobot-worker
+    restart: unless-stopped
+    command: nautobot-server celery worker
+    environment: *nautobot-env
+    depends_on:
+      nautobot:
         condition: service_healthy
     networks:
       - netwatch-net

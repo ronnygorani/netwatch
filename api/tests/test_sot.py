@@ -99,10 +99,6 @@ def test_sync_endpoint_end_to_end(client, make_api_key, monkeypatch):
 
     monkeypatch.setattr(settings, "nautobot_token", "test-token")
     monkeypatch.setattr(nautobot, "fetch_nautobot_devices", lambda: [NB_DEVICE])
-    # The router imported the symbol directly; patch it there too.
-    from app.routers import sot
-
-    monkeypatch.setattr(sot, "fetch_nautobot_devices", lambda: [NB_DEVICE])
 
     key = make_api_key(name="syncer", scopes="sot:sync")
     resp = client.post("/v1/sot/sync", headers={"X-API-Key": key})
@@ -111,3 +107,26 @@ def test_sync_endpoint_end_to_end(client, make_api_key, monkeypatch):
 
     devices = client.get("/v1/devices").json()["items"]
     assert devices[0]["nautobot_id"] == NB_DEVICE["id"]
+
+    status = client.get("/v1/sot/status").json()
+    assert status["configured"] is True
+    assert status["last_sync_at"] is not None
+    assert status["last_counts"]["created"] == 1
+
+
+def test_sot_linked_devices_reject_local_writes(client, auth_headers, test_db):
+    with test_db.session_factory() as db:
+        sync_devices(db, [_mapped()])
+    device = client.get("/v1/devices").json()["items"][0]
+
+    patch = client.patch(
+        f"/v1/devices/{device['id']}", json={"site": "Rogue"}, headers=auth_headers
+    )
+    assert patch.status_code == 409
+    delete = client.delete(f"/v1/devices/{device['id']}", headers=auth_headers)
+    assert delete.status_code == 409
+
+    # Once the SoT drops the device (deactivated), local cleanup is allowed.
+    with test_db.session_factory() as db:
+        sync_devices(db, [])
+    assert client.delete(f"/v1/devices/{device['id']}", headers=auth_headers).status_code == 204
