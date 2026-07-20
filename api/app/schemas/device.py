@@ -35,4 +35,5 @@ class DeviceResponse(BaseModel):
     device_type: str
     port: int
     is_active: bool
+    nautobot_id: str | None
     created_at: datetime

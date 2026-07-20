@@ -178,6 +178,11 @@
       <span class="stat-label">Poller</span>
       <span class="stat-value" id="stat-poller">—</span>
     </div>
+
+    <div class="stat">
+      <span class="stat-label">SoT Sync</span>
+      <span class="stat-value" id="stat-sot">—</span>
+    </div>
   </div>
 
   <!-- ── Error Banner (hidden until fetch fails) ──────────── -->
@@ -286,6 +291,29 @@
       }
     }
 
+    // Stale = no successful sync in over two poll cycles (FM-N1).
+    async function refreshSot() {
+      try {
+        const resp = await fetch(`${API_BASE}/v1/sot/status`);
+        const s = await resp.json();
+        if (!s.configured) {
+          setValue('stat-sot', 'not configured', 'unknown');
+          return;
+        }
+        if (!s.last_sync_at) {
+          setValue('stat-sot', 'no sync yet', 'unknown');
+          return;
+        }
+        const ageSec = Math.round((Date.now() - new Date(s.last_sync_at).getTime()) / 1000);
+        const c = s.last_counts || {};
+        const label = `+${c.created ?? 0} ~${c.updated ?? 0} -${c.deactivated ?? 0}, ${ageSec}s ago`;
+        const stale = ageSec > 150;
+        setValue('stat-sot', stale ? `stale: ${label}` : label, stale ? 'degraded' : 'healthy');
+      } catch {
+        setValue('stat-sot', 'unreachable', 'degraded');
+      }
+    }
+
     // Escape API-supplied text before innerHTML insertion (stored XSS, FM-A7).
     function esc(value) {
       return String(value).replace(/[&<>"']/g, c => ({
@@ -336,9 +364,11 @@
     refreshHealth();
     refreshDevices();
     refreshPoller();
+    refreshSot();
     setInterval(refreshHealth, POLL_INTERVAL_MS);
     setInterval(refreshDevices, POLL_INTERVAL_MS);
     setInterval(refreshPoller, POLL_INTERVAL_MS);
+    setInterval(refreshSot, POLL_INTERVAL_MS);
   </script>
 
 </body>

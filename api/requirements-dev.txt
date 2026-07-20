@@ -2,9 +2,8 @@
 
 -r requirements.txt
 
-# Testing (httpx is required by Starlette's TestClient)
+# Testing (httpx moved to runtime requirements with the SoT sync client)
 pytest==9.1.1
-httpx==0.28.1
 
 # Lint + format — version must match the CI workflow
 ruff==0.15.20

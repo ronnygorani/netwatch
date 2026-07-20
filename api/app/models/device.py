@@ -16,6 +16,10 @@ class Device(Base):
     device_type: Mapped[str] = mapped_column(String(32), nullable=False, default="cisco_ios")
     port: Mapped[int] = mapped_column(Integer, nullable=False, default=22)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Link to the source-of-truth record; null means a local/manual device.
+    nautobot_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, unique=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

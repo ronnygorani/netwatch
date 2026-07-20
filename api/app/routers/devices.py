@@ -74,6 +74,11 @@ def update_device(
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    if device.nautobot_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Device is managed by the source of truth; make changes in Nautobot",
+        )
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(device, field, value)
     db.commit()
@@ -90,5 +95,12 @@ def delete_device(
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    # Active SoT rows are Nautobot's to remove; deactivated ones may be
+    # cleaned up locally after they leave the SoT.
+    if device.nautobot_id is not None and device.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Device is managed by the source of truth; remove it in Nautobot",
+        )
     db.delete(device)
     db.commit()
