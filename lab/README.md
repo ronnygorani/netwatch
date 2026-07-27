@@ -3,6 +3,21 @@
 Three Arista cEOS switches (one spine, two leaves) defined as code and run by
 [ContainerLab](https://containerlab.dev) inside WSL2 Ubuntu.
 
+## Daily on/off
+
+The lab uses ~2GB of RAM while running, so turn it off when you are not working.
+
+- **ON:**  `wsl -d Ubuntu -u root -- bash /path/to/lab/up.sh` (stack + switches)
+- **OFF:** `wsl --shutdown` (stops everything and frees the RAM)
+
+Wrapping those two commands in local double-click scripts is convenient; keep
+such scripts out of the repo since they carry machine-specific paths.
+
+Data is safe across off/on: the databases, API keys, and config backups live on
+the WSL disk and persist. Only the switches are redeployed on the next start
+(they take 1-2 minutes to boot EOS). The 24/7 always-on option arrives with the
+cloud phase (Kubernetes).
+
 ## Prerequisites
 
 - Native Docker engine inside WSL2 Ubuntu (`apt install docker.io docker-compose-v2`).

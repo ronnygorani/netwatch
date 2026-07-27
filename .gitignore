@@ -51,3 +51,6 @@ CLAUDE.md
 
 # ContainerLab runtime state (TLS keys, node flash) — topology YAML is the source
 lab/clab-*/
+
+# Local machine convenience scripts (personal paths, not for the public repo)
+local/

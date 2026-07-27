@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # Shared secret for verifying Nautobot webhook signatures; empty disables.
     nautobot_webhook_secret: str = ""
 
+    # Job queue broker. DB 2: Nautobot's cache and celery use 0 and 1.
+    redis_url: str = "redis://redis:6379/2"
+
+    # Device credentials for job executors (same pair the poller uses).
+    netmiko_username: str = ""
+    netmiko_password: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
