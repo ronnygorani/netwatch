@@ -54,3 +54,6 @@ lab/clab-*/
 
 # Local machine convenience scripts (personal paths, not for the public repo)
 local/
+
+# Lab setup notes - local only (machine-specific steps, not needed for cloud deploys)
+lab/README.md

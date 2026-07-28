@@ -54,7 +54,8 @@ docker compose up -d poller
 The API is now at `http://localhost:8000` (interactive docs at `/docs`). Open
 `dashboard/index.html` in a browser for the live dashboard.
 
-To run the virtual switch lab, see [lab/README.md](lab/README.md).
+A three-switch Arista cEOS lab topology for ContainerLab is included under
+`lab/` for local development against real network operating systems.
 
 ## API overview
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# One-command lab bring-up. Run inside WSL2 Ubuntu:
-#   wsl -d Ubuntu -u root -- bash /mnt/c/Users/ronny/Projects/NetWatch/lab/up.sh
+# One-command lab bring-up. Run inside WSL2 Ubuntu, as root:
+#   bash lab/up.sh
 #
 # WSL shuts its VM down when idle (vmIdleTimeout is unreliable), which kills
 # the ContainerLab switches; compose services restart themselves but the lab
