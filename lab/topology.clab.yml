@@ -1,6 +1,6 @@
 # NetWatch virtual lab: one spine, two leaves (Arista cEOS).
-# Deploy from WSL2 Ubuntu:
-#   sudo containerlab deploy -t /mnt/c/Users/ronny/Projects/NetWatch/lab/topology.clab.yml
+# Deploy from the repo root, on a host with a native Docker engine:
+#   containerlab deploy -t lab/topology.clab.yml
 # Then connect the poller to the lab mgmt network:
 #   docker network connect netwatch-lab netwatch-poller
 name: netwatch

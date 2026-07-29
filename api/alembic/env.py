@@ -7,7 +7,9 @@ from app.config import settings
 from app.database import Base
 from app.models import (  # noqa: F401 — registers tables with Base
     ApiKey,
+    ConfigBackup,
     Device,
+    Job,
     Metric,
     PollerHeartbeat,
 )

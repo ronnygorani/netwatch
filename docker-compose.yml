@@ -54,6 +54,27 @@ services:
         aliases:
           - api.netwatch.internal
 
+  # Executes queued jobs (config backups now, Ansible runs next). Shares the
+  # API image and code; runs the RQ worker instead of uvicorn.
+  worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: netwatch-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: rq worker --url ${REDIS_URL:-redis://redis:6379/2} netwatch
+    volumes:
+      - ./api/app:/app/app
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - netwatch-net
+
   poller:
     build:
       context: ./poller

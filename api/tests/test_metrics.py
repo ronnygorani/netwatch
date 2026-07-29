@@ -73,6 +73,27 @@ def test_get_latest_metrics_one_row_per_device(client, create_device, auth_heade
     assert all(m["status"] == "down" for m in latest)  # the newer row won
 
 
+def test_latest_metrics_breaks_timestamp_ties(client, create_device, test_db):
+    """Two metrics sharing a collected_at must still yield exactly one row (FM-E6).
+
+    A max(collected_at) join returns both; ranking with an id tiebreak wins.
+    """
+    from datetime import UTC, datetime
+
+    from app.models.metric import Metric
+
+    device = create_device()
+    same_instant = datetime.now(UTC)
+    with test_db.session_factory() as db:
+        db.add(Metric(device_id=device["id"], status="up", collected_at=same_instant))
+        db.add(Metric(device_id=device["id"], status="down", collected_at=same_instant))
+        db.commit()
+
+    latest = client.get("/v1/metrics/latest").json()["items"]
+    assert len(latest) == 1
+    assert latest[0]["status"] == "down"  # the higher id wins the tie
+
+
 def test_latest_metrics_omits_devices_without_data(client, create_device):
     """Contract: devices with no metrics are absent, not present-with-nulls."""
     create_device()

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -55,22 +55,17 @@ def get_device_metrics(
 
 @router.get("/metrics/latest", response_model=Page[MetricResponse])
 def get_latest_metrics(db: Session = Depends(get_db)):
-    subquery = (
-        db.query(
-            Metric.device_id,
-            func.max(Metric.collected_at).label("max_collected_at"),
+    # Rank per device and take rank 1. The id tiebreak matters: two metrics can
+    # share a collected_at timestamp, and a max() join would return both (FM-E6).
+    ranked = select(
+        Metric.id,
+        func.row_number()
+        .over(
+            partition_by=Metric.device_id,
+            order_by=[Metric.collected_at.desc(), Metric.id.desc()],
         )
-        .group_by(Metric.device_id)
-        .subquery()
-    )
-    items = (
-        db.query(Metric)
-        .join(
-            subquery,
-            (Metric.device_id == subquery.c.device_id)
-            & (Metric.collected_at == subquery.c.max_collected_at),
-        )
-        .all()
-    )
+        .label("rank"),
+    ).subquery()
+    items = db.query(Metric).join(ranked, (Metric.id == ranked.c.id) & (ranked.c.rank == 1)).all()
     # Bounded by device count; envelope kept for consistency, not paged.
     return Page(items=items, total=len(items), limit=len(items) or 1, offset=0)
