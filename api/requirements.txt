@@ -11,4 +11,4 @@ pydantic-settings==2.14.2
 httpx==0.28.1
 rq==2.10.0
 redis==8.0.1
-napalm==5.1.0
+napalm==5.2.0
