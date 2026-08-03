@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # Job queue broker. DB 2: Nautobot's cache and celery use 0 and 1.
     redis_url: str = "redis://redis:6379/2"
 
+    # Human auth. Rotating jwt_secret invalidates every issued token.
+    jwt_secret: str = "changeme_jwt_secret"
+    jwt_expire_minutes: int = 60
+
+    # Enqueue a config backup if the newest one is older than this; 0 disables.
+    backup_interval_hours: int = 24
+
     # Device credentials for job executors (same pair the poller uses).
     netmiko_username: str = ""
     netmiko_password: str = ""
