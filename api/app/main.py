@@ -8,7 +8,19 @@ from fastapi.responses import RedirectResponse
 from app import __version__
 from app.config import settings
 from app.models import Device, Metric, PollerHeartbeat  # noqa: F401 — registers with Base
-from app.routers import backups, devices, health, jobs, metrics, poller, sot, webhooks
+from app.routers import (
+    audit,
+    auth,
+    backups,
+    changes,
+    devices,
+    health,
+    jobs,
+    metrics,
+    poller,
+    sot,
+    webhooks,
+)
 
 logging.basicConfig(
     level=settings.log_level.upper(),
@@ -63,6 +75,9 @@ def create_app() -> FastAPI:
     app.include_router(webhooks.router, prefix="/v1")
     app.include_router(jobs.router, prefix="/v1")
     app.include_router(backups.router, prefix="/v1")
+    app.include_router(auth.router, prefix="/v1")
+    app.include_router(changes.router, prefix="/v1")
+    app.include_router(audit.router, prefix="/v1")
 
     # Legacy unversioned paths: 308 preserves method and body, unlike 301.
     # Remove after one phase (CONTRACTS section 1).

@@ -13,6 +13,7 @@ from napalm import get_network_driver
 
 from app.config import settings
 from app.database import SessionLocal
+from app.models.audit import AuditEvent
 from app.models.config_backup import ConfigBackup
 from app.models.device import Device
 from app.models.job import Job
@@ -29,7 +30,7 @@ NAPALM_DRIVERS = {
 }
 
 
-def _get_running_config(device: Device) -> str:
+def _connect(device: Device):
     driver_name = NAPALM_DRIVERS[device.device_type]
     driver = get_network_driver(driver_name)
     optional_args = {"port": device.port} if driver_name != "eos" else {}
@@ -41,6 +42,11 @@ def _get_running_config(device: Device) -> str:
         optional_args=optional_args,
     )
     conn.open()
+    return conn
+
+
+def _get_running_config(device: Device) -> str:
+    conn = _connect(device)
     try:
         return conn.get_config(retrieve="running")["running"]
     finally:
@@ -89,7 +95,119 @@ def execute_config_backup(db, job: Job) -> dict:
     return result
 
 
-EXECUTORS = {"config_backup": execute_config_backup}
+def _apply_to_device(device: Device, snippet: str) -> dict:
+    """Push config to one device with validation and automatic rollback.
+
+    The device computes the diff itself (compare_config), so what the approver
+    reviewed is what the device says it will do, not our guess.
+    """
+    conn = _connect(device)
+    try:
+        conn.load_merge_candidate(config=snippet)
+        diff = conn.compare_config()
+        if not diff.strip():
+            conn.discard_config()
+            return {"status": "no_change", "diff": ""}
+        conn.commit_config()
+    except Exception:
+        try:
+            conn.discard_config()
+        except Exception:
+            logger.warning("Could not discard candidate config on %s", device.hostname)
+        raise
+    finally:
+        conn.close()
+
+    # Post-change validation on a fresh session: if the device stopped answering
+    # after its own commit, the change broke it and must come back out.
+    try:
+        verify = _connect(device)
+        try:
+            verify.get_facts()
+        finally:
+            verify.close()
+    except Exception as exc:
+        rolled_back = False
+        try:
+            recover = _connect(device)
+            try:
+                recover.rollback()
+                rolled_back = True
+            finally:
+                recover.close()
+        except Exception:
+            logger.exception("Rollback failed for %s", device.hostname)
+        return {
+            "status": "rolled_back" if rolled_back else "failed_validation",
+            "diff": diff,
+            "error": str(exc),
+        }
+
+    return {"status": "applied", "diff": diff}
+
+
+def execute_change_job(db, job: Job) -> dict:
+    from app.models.change import Change
+
+    change = db.get(Change, job.params["change_id"])
+    if change is None:
+        raise ValueError(f"Change {job.params['change_id']} not found")
+
+    devices = db.query(Device).filter(Device.id.in_(change.device_ids)).all()
+    diffs: dict[str, str] = {}
+    outcomes: dict[str, str] = {}
+
+    for device in devices:
+        # Pre-change snapshot so the previous state is always recoverable.
+        try:
+            _backup_one(db, device)
+        except Exception as exc:
+            logger.warning("Pre-change backup failed for %s: %s", device.hostname, exc)
+
+        try:
+            result = _apply_to_device(device, change.config_snippet)
+            outcomes[device.hostname] = result["status"]
+            diffs[device.hostname] = result.get("diff", "")
+        except Exception as exc:
+            outcomes[device.hostname] = "failed"
+            diffs[device.hostname] = ""
+            logger.exception("Change %s failed on %s", change.id, device.hostname)
+            change.result = {"error_device": device.hostname, "error": str(exc)}
+
+        # Post-change snapshot records what the device looks like now.
+        try:
+            _backup_one(db, device)
+        except Exception as exc:
+            logger.warning("Post-change backup failed for %s: %s", device.hostname, exc)
+
+    change.diff = diffs
+    change.executed_at = datetime.now(UTC)
+    statuses = set(outcomes.values())
+    if statuses <= {"applied", "no_change"}:
+        change.status = "succeeded"
+    elif "rolled_back" in statuses:
+        change.status = "rolled_back"
+    else:
+        change.status = "failed"
+    change.result = {**(change.result or {}), "devices": outcomes}
+
+    db.add(
+        AuditEvent(
+            actor=job.requested_by,
+            actor_type="service",
+            action=f"change.{change.status}",
+            resource=f"changes/{change.id}",
+            detail={"devices": outcomes},
+        )
+    )
+    db.commit()
+    return {"change_id": change.id, "status": change.status, "devices": outcomes}
+
+
+EXECUTORS = {
+    "config_backup": execute_config_backup,
+    "execute_change": execute_change_job,
+}
 
 
 def run_job(job_id: int) -> None:
