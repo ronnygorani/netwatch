@@ -95,8 +95,8 @@ image build.
 | 1     | API foundation, PostgreSQL, Docker, CI                             | Done        |
 | 2     | Device inventory, SSH poller, dashboard                            | Done        |
 | 3     | Auth, migrations, concurrency, versioning, rate limits, retention  | Done        |
-| 4     | ContainerLab cEOS lab, multi-vendor polling via NAPALM             | In progress |
-| 5     | Nautobot as the source of truth                                    | Planned     |
-| 6     | Ansible execution and a change workflow with approvals             | Planned     |
+| 4     | ContainerLab cEOS lab, multi-vendor polling via NAPALM             | Done        |
+| 5     | Nautobot as the source of truth                                    | Done        |
+| 6     | Ansible execution and a change workflow with approvals             | In progress |
 | 7     | Config drift detection, streaming telemetry                        | Planned     |
 | 8     | Kubernetes, Terraform, AWS deployment                              | Planned     |
