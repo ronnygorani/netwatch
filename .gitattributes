@@ -1,0 +1,10 @@
+# Normalize line endings. Without this, Windows checkouts get CRLF and any
+# script executed inside Linux (WSL, containers) fails on the stray \r.
+* text=auto
+
+# Must be LF: executed by bash/sh in WSL or in containers.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.cfg text eol=lf
