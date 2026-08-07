@@ -2,7 +2,7 @@
 # Test and lint tooling lives in requirements-dev.txt.
 # Pinned to exact versions for reproducible builds.
 
-fastapi==0.139.0
+fastapi==0.141.1
 uvicorn[standard]==0.52.0
 sqlalchemy==2.0.51
 alembic==1.18.5
