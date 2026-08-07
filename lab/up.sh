@@ -9,7 +9,10 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "== stack =="
-docker compose up -d
+# --build so a dependency or code change is picked up; layer caching keeps
+# this fast when nothing changed. Without it the stack silently runs a stale
+# image and fails on imports that only exist in the current requirements.
+docker compose up -d --build
 until curl -s -m 3 http://localhost:8000/health | grep -q healthy; do sleep 3; done
 echo "api healthy"
 
