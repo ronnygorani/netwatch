@@ -10,6 +10,8 @@ from app.models import (  # noqa: F401 — registers tables with Base
     AuditEvent,
     Change,
     ConfigBackup,
+    ConfigTemplate,
+    ConfigVariable,
     Device,
     Job,
     Metric,

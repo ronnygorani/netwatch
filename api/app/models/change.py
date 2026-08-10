@@ -19,9 +19,15 @@ class Change(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Config lines to merge into the running config on each target.
+    # Config lines to merge into the running config on each target. When a
+    # template is used this holds the template body for reference and
+    # `rendered` holds the per-device output that actually gets pushed.
     config_snippet: Mapped[str] = mapped_column(Text, nullable=False)
     device_ids: Mapped[list] = mapped_column(JSON, nullable=False)
+    template_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # {device_id: rendered_config} captured at proposal time so the approver
+    # approves exactly what will be pushed, even if variables change later.
+    rendered: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed", index=True)
 
     author_id: Mapped[int] = mapped_column(

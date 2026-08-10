@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app import audit
 from app.database import get_db
 from app.models.change import Change
+from app.models.config_template import ConfigTemplate
 from app.models.device import Device
 from app.models.job import Job
 from app.models.user import User
@@ -13,6 +14,7 @@ from app.queue import enqueue_job
 from app.schemas.change import ChangeCreate, ChangeReject, ChangeResponse
 from app.schemas.pagination import Page
 from app.security import require_role
+from app.templating import render_for_device
 
 router = APIRouter(prefix="/changes", tags=["changes"])
 
@@ -47,10 +49,34 @@ def propose_change(
             detail=f"Unknown device ids: {sorted(missing)}",
         )
 
+    rendered: dict[str, str] | None = None
+    snippet = payload.config_snippet or ""
+    if payload.template_name:
+        template = (
+            db.query(ConfigTemplate).filter(ConfigTemplate.name == payload.template_name).first()
+        )
+        if template is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown template '{payload.template_name}'",
+            )
+        # Render now, not at execution: the approver must approve exactly what
+        # will be pushed, even if variables change between approval and execute.
+        devices = db.query(Device).filter(Device.id.in_(payload.device_ids)).all()
+        try:
+            rendered = {str(d.id): render_for_device(db, template, d) for d in devices}
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from None
+        snippet = template.body
+
     change = Change(
         title=payload.title,
         description=payload.description,
-        config_snippet=payload.config_snippet,
+        config_snippet=snippet,
+        template_name=payload.template_name,
+        rendered=rendered,
         device_ids=payload.device_ids,
         author_id=author.id,
         status="proposed",
