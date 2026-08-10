@@ -19,6 +19,7 @@ from app.routers import (
     metrics,
     poller,
     sot,
+    templating,
     webhooks,
 )
 
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/v1")
     app.include_router(changes.router, prefix="/v1")
     app.include_router(audit.router, prefix="/v1")
+    app.include_router(templating.router, prefix="/v1")
 
     # Legacy unversioned paths: 308 preserves method and body, unlike 301.
     # Remove after one phase (CONTRACTS section 1).

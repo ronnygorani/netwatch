@@ -1,14 +1,22 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ChangeCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=128)
     description: str | None = None
-    # Config lines merged into the running config of every target device.
-    config_snippet: str = Field(..., min_length=1, max_length=20_000)
+    # Either supply config lines directly, or name a template to render per
+    # device from its resolved variables. Exactly one of the two.
+    config_snippet: str | None = Field(default=None, min_length=1, max_length=20_000)
+    template_name: str | None = Field(default=None, max_length=64)
     device_ids: list[int] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def _one_source(self) -> "ChangeCreate":
+        if bool(self.config_snippet) == bool(self.template_name):
+            raise ValueError("provide exactly one of config_snippet or template_name")
+        return self
 
 
 class ChangeReject(BaseModel):
@@ -22,6 +30,8 @@ class ChangeResponse(BaseModel):
     title: str
     description: str | None
     config_snippet: str
+    template_name: str | None
+    rendered: dict | None
     device_ids: list[int]
     status: str
     author_id: int

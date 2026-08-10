@@ -11,7 +11,14 @@ whole platform can be run and demonstrated on one machine.
 
 ## Features
 
-- Device inventory with full CRUD over a versioned REST API (`/v1`)
+- Change management: propose a config change, review the diff the device itself
+  computes, require approval from a second person, execute in the background,
+  validate afterwards, and roll back automatically on failure
+- Config templating with global/site/device variable inheritance, so a VLAN is
+  declared once at the site level and every switch there inherits it
+- Append-only audit trail of every state-changing action
+- Device inventory synced from Nautobot as the source of truth, with full CRUD
+  over a versioned REST API (`/v1`)
 - Scheduled SSH health polling (CPU, memory, uptime) with a bounded concurrent
   worker pool; one slow or dead device never stalls a cycle
 - Scoped API key authentication for services (keys stored as SHA-256 hashes only)
@@ -71,10 +78,23 @@ A three-switch Arista cEOS lab topology for ContainerLab is included under
 | GET    | `/v1/metrics/latest`        | Latest metric per device       | none           |
 | POST   | `/v1/poller/heartbeat`      | Collector liveness report      | `metrics:write`|
 | GET    | `/v1/poller/status`         | Collector status               | none           |
+| POST   | `/v1/sot/sync`              | Sync inventory from Nautobot   | `sot:sync`     |
+| POST   | `/v1/webhooks/nautobot`     | Source-of-truth change event   | HMAC signature |
+| POST   | `/v1/jobs`                  | Queue a background job         | `jobs:run`     |
+| GET    | `/v1/jobs/{id}`             | Job status and result          | none           |
+| GET    | `/v1/backups/{id}`          | Config backup content          | `backups:read` |
+| POST   | `/v1/auth/login`            | Obtain a JWT                   | none           |
+| POST   | `/v1/changes`               | Propose a config change        | operator       |
+| POST   | `/v1/changes/{id}/approve`  | Approve (never your own)       | approver       |
+| POST   | `/v1/changes/{id}/execute`  | Execute an approved change     | operator       |
+| PUT    | `/v1/variables`             | Set variables for a scope      | operator       |
+| POST   | `/v1/templates/{name}/render` | Preview rendered config      | none           |
+| GET    | `/v1/audit`                 | Audit trail                    | approver       |
 
-Authenticated endpoints take an `X-API-Key` header. List endpoints return
-`{items, total, limit, offset}` envelopes. Full request and response schemas are
-in the interactive docs at `/docs`.
+Services authenticate with an `X-API-Key` header and scoped keys; people log in
+for a JWT and carry a role (viewer, operator, approver, admin). List endpoints
+return `{items, total, limit, offset}` envelopes. Full request and response
+schemas are in the interactive docs at `/docs`.
 
 ## Development
 

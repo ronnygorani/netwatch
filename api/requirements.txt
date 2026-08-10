@@ -14,3 +14,4 @@ redis==8.0.1
 napalm==5.2.0
 pyjwt==2.13.0
 python-multipart==0.0.32
+jinja2==3.1.6

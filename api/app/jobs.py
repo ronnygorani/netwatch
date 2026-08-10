@@ -164,8 +164,11 @@ def execute_change_job(db, job: Job) -> dict:
         except Exception as exc:
             logger.warning("Pre-change backup failed for %s: %s", device.hostname, exc)
 
+        # Template-based changes carry per-device output rendered at proposal
+        # time; direct changes push the same snippet everywhere.
+        snippet = (change.rendered or {}).get(str(device.id), change.config_snippet)
         try:
-            result = _apply_to_device(device, change.config_snippet)
+            result = _apply_to_device(device, snippet)
             outcomes[device.hostname] = result["status"]
             diffs[device.hostname] = result.get("diff", "")
         except Exception as exc:
