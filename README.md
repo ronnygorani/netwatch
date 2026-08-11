@@ -31,16 +31,18 @@ whole platform can be run and demonstrated on one machine.
 
 ## Architecture
 
-Three services run under Docker Compose: a PostgreSQL database, the FastAPI
-control plane, and the SSH poller. Every component communicates exclusively
-through the API; nothing else touches the database. Configuration enters only
-through environment variables, so the same images run in development, CI, and
-production.
+Docker Compose runs the FastAPI control plane, a PostgreSQL database, the SSH
+poller, a background worker for long-running jobs, Redis as the job broker, and
+Nautobot with its own database as the source of truth. Every component
+communicates exclusively through the API; nothing else touches the application
+database. Configuration enters only through environment variables, so the same
+images run in development, CI, and production.
 
 ## Tech stack
 
-Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, PostgreSQL 16, Netmiko,
-Docker Compose, ContainerLab with Arista cEOS, GitHub Actions.
+Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, PostgreSQL 16, Redis + RQ,
+NAPALM and Netmiko, Nautobot, Jinja2, JWT + PBKDF2, Docker Compose,
+ContainerLab with Arista cEOS, GitHub Actions.
 
 ## Quick start
 
@@ -117,6 +119,6 @@ image build.
 | 3     | Auth, migrations, concurrency, versioning, rate limits, retention  | Done        |
 | 4     | ContainerLab cEOS lab, multi-vendor polling via NAPALM             | Done        |
 | 5     | Nautobot as the source of truth                                    | Done        |
-| 6     | Ansible execution and a change workflow with approvals             | In progress |
+| 6     | Change workflow with approvals, job queue, audit trail, templating | Done        |
 | 7     | Config drift detection, streaming telemetry                        | Planned     |
 | 8     | Kubernetes, Terraform, AWS deployment                              | Planned     |
