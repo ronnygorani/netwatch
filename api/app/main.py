@@ -14,6 +14,7 @@ from app.routers import (
     backups,
     changes,
     devices,
+    drift,
     health,
     jobs,
     metrics,
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(changes.router, prefix="/v1")
     app.include_router(audit.router, prefix="/v1")
     app.include_router(templating.router, prefix="/v1")
+    app.include_router(drift.router, prefix="/v1")
 
     # Legacy unversioned paths: 308 preserves method and body, unlike 301.
     # Remove after one phase (CONTRACTS section 1).

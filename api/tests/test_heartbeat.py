@@ -51,3 +51,21 @@ def test_heartbeat_rejects_negative_counts(client, auth_headers):
 
 def test_status_read_is_open(client):
     assert client.get("/v1/poller/status").status_code == 200
+
+
+def test_stable_network_does_not_requeue_sweeps(client, auth_headers, test_db):
+    """A sweep that stored nothing still counts as a sweep (FM-A10)."""
+    from datetime import UTC, datetime
+
+    from app.models.job import Job
+
+    client.post("/v1/poller/heartbeat", json=HEARTBEAT, headers=auth_headers)
+    with test_db.session_factory() as db:
+        job = db.query(Job).filter(Job.type == "config_backup").one()
+        job.status = "succeeded"
+        job.finished_at = datetime.now(UTC)
+        db.commit()
+
+    client.post("/v1/poller/heartbeat", json=HEARTBEAT, headers=auth_headers)
+    with test_db.session_factory() as db:
+        assert db.query(Job).filter(Job.type == "config_backup").count() == 1
