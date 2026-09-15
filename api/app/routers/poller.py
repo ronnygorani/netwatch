@@ -9,7 +9,6 @@ from app.auth import require_scope
 from app.config import settings
 from app.database import get_db
 from app.models.api_key import ApiKey
-from app.models.config_backup import ConfigBackup
 from app.models.job import Job
 from app.models.metric import Metric
 from app.models.poller_heartbeat import PollerHeartbeat
@@ -59,16 +58,23 @@ def record_heartbeat(
 
 
 def _maybe_schedule_backup(db: Session) -> int | None:
-    """Queue a config backup when the newest one is older than the interval.
+    """Queue a config snapshot sweep when the last one is older than the interval.
 
     Same piggyback pattern as retention: the heartbeat is a reliable tick, so
     periodic work rides it rather than requiring a scheduler.
+
+    Measured from the last sweep, not the newest backup row: backups are
+    change-only, so a stable network would look permanently overdue (FM-A10).
     """
     if settings.backup_interval_hours <= 0:
         return None
     cutoff = datetime.now(UTC) - timedelta(hours=settings.backup_interval_hours)
-    newest = db.query(func.max(ConfigBackup.taken_at)).scalar()
-    if newest is not None and newest.replace(tzinfo=UTC) > cutoff:
+    last_sweep = (
+        db.query(func.max(Job.finished_at))
+        .filter(Job.type == "config_backup", Job.status == "succeeded")
+        .scalar()
+    )
+    if last_sweep is not None and last_sweep.replace(tzinfo=UTC) > cutoff:
         return None
     # Avoid piling up duplicates if the worker is down or slow.
     pending = (

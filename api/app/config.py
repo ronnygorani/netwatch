@@ -43,8 +43,11 @@ class Settings(BaseSettings):
     jwt_secret: str = "changeme_jwt_secret"
     jwt_expire_minutes: int = 60
 
-    # Enqueue a config backup if the newest one is older than this; 0 disables.
-    backup_interval_hours: int = 24
+    # Config snapshot sweep; also the drift check, so this is detection latency.
+    backup_interval_hours: int = 6
+
+    # Config change counts as authorized if a change on that device ran this recently.
+    drift_correlation_minutes: int = 60
 
     # Device credentials for job executors (same pair the poller uses).
     netmiko_username: str = ""

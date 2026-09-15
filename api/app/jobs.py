@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 from napalm import get_network_driver
 
+from app import drift
 from app.config import settings
 from app.database import SessionLocal
 from app.models.audit import AuditEvent
@@ -54,7 +55,7 @@ def _get_running_config(device: Device) -> str:
 
 
 def _backup_one(db, device: Device) -> str:
-    """Fetch a device's config; store only if it changed. Returns an outcome word."""
+    """Fetch a device's config; store it if it changed, and record the drift."""
     content = _get_running_config(device)
     content_hash = hashlib.sha256(content.encode()).hexdigest()
 
@@ -67,8 +68,14 @@ def _backup_one(db, device: Device) -> str:
     if latest and latest.content_hash == content_hash:
         return "unchanged"
 
-    db.add(ConfigBackup(device_id=device.id, content_hash=content_hash, content=content))
-    return "backed_up"
+    backup = ConfigBackup(device_id=device.id, content_hash=content_hash, content=content)
+    db.add(backup)
+    if latest is None:
+        return "backed_up"  # first snapshot is a baseline, not drift
+
+    db.flush()
+    event = drift.record(db, device, previous=latest, current=backup)
+    return "drifted" if event.classification == "unauthorized" else "backed_up"
 
 
 def execute_config_backup(db, job: Job) -> dict:
@@ -78,7 +85,7 @@ def execute_config_backup(db, job: Job) -> dict:
         query = query.filter(Device.id.in_(device_ids))
     devices = query.filter(Device.device_type.in_(NAPALM_DRIVERS)).all()
 
-    outcomes = {"backed_up": 0, "unchanged": 0, "failed": 0}
+    outcomes = {"backed_up": 0, "unchanged": 0, "drifted": 0, "failed": 0}
     errors: dict[str, str] = {}
     for device in devices:
         try:

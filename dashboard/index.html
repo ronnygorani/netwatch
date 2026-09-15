@@ -183,6 +183,11 @@
       <span class="stat-label">SoT Sync</span>
       <span class="stat-value" id="stat-sot">—</span>
     </div>
+
+    <div class="stat">
+      <span class="stat-label">Config Drift</span>
+      <span class="stat-value" id="stat-drift">—</span>
+    </div>
   </div>
 
   <!-- ── Error Banner (hidden until fetch fails) ──────────── -->
@@ -314,6 +319,20 @@
       }
     }
 
+    // Only unexplained drift is alertable; approved changes are already accounted for.
+    async function refreshDrift() {
+      try {
+        const resp = await fetch(
+          `${API_BASE}/v1/drift?status=open&classification=unauthorized&limit=1`);
+        const total = (await resp.json()).total;
+        setValue('stat-drift',
+          total ? `${total} unexplained` : 'none unexplained',
+          total ? 'degraded' : 'healthy');
+      } catch {
+        setValue('stat-drift', 'unreachable', 'degraded');
+      }
+    }
+
     // Escape API-supplied text before innerHTML insertion (stored XSS, FM-A7).
     function esc(value) {
       return String(value).replace(/[&<>"']/g, c => ({
@@ -365,10 +384,12 @@
     refreshDevices();
     refreshPoller();
     refreshSot();
+    refreshDrift();
     setInterval(refreshHealth, POLL_INTERVAL_MS);
     setInterval(refreshDevices, POLL_INTERVAL_MS);
     setInterval(refreshPoller, POLL_INTERVAL_MS);
     setInterval(refreshSot, POLL_INTERVAL_MS);
+    setInterval(refreshDrift, POLL_INTERVAL_MS);
   </script>
 
 </body>

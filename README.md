@@ -16,6 +16,9 @@ whole platform can be run and demonstrated on one machine.
   validate afterwards, and roll back automatically on failure
 - Config templating with global/site/device variable inheritance, so a VLAN is
   declared once at the site level and every switch there inherits it
+- Config drift detection correlated with the change workflow: every config change
+  is recorded with a diff and marked authorized or unauthorized depending on
+  whether an approved change explains it
 - Append-only audit trail of every state-changing action
 - Device inventory synced from Nautobot as the source of truth, with full CRUD
   over a versioned REST API (`/v1`)
@@ -91,6 +94,9 @@ A three-switch Arista cEOS lab topology for ContainerLab is included under
 | POST   | `/v1/changes/{id}/execute`  | Execute an approved change     | operator       |
 | PUT    | `/v1/variables`             | Set variables for a scope      | operator       |
 | POST   | `/v1/templates/{name}/render` | Preview rendered config      | none           |
+| GET    | `/v1/drift`                 | Observed config changes        | none           |
+| GET    | `/v1/drift/{id}/diff`       | Unified diff of a drift event  | viewer         |
+| POST   | `/v1/drift/{id}/acknowledge`| Explain unauthorized drift     | operator       |
 | GET    | `/v1/audit`                 | Audit trail                    | approver       |
 
 Services authenticate with an `X-API-Key` header and scoped keys; people log in
@@ -120,5 +126,5 @@ image build.
 | 4     | ContainerLab cEOS lab, multi-vendor polling via NAPALM             | Done        |
 | 5     | Nautobot as the source of truth                                    | Done        |
 | 6     | Change workflow with approvals, job queue, audit trail, templating | Done        |
-| 7     | Config drift detection, streaming telemetry                        | Planned     |
+| 7     | Config drift detection (done), streaming telemetry                 | In progress |
 | 8     | Kubernetes, Terraform, AWS deployment                              | Planned     |

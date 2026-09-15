@@ -84,7 +84,13 @@ def test_backup_executor_stores_and_dedupes(client, test_db, monkeypatch):
     with test_db.session_factory() as db:
         job = db.get(Job, job_id)
         assert job.status == "succeeded"
-        assert job.result == {"devices": 1, "backed_up": 1, "unchanged": 0, "failed": 0}
+        assert job.result == {
+            "devices": 1,
+            "backed_up": 1,
+            "unchanged": 0,
+            "drifted": 0,
+            "failed": 0,
+        }
         backups = db.query(ConfigBackup).filter(ConfigBackup.device_id == device_id).all()
         assert len(backups) == 1
         assert backups[0].content_hash == hashlib.sha256(FAKE_CONFIG.encode()).hexdigest()
