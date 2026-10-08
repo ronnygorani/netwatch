@@ -54,7 +54,7 @@ services:
         aliases:
           - api.netwatch.internal
 
-  # Executes queued jobs (config backups now, Ansible runs next). Shares the
+  # Executes queued jobs (config snapshot sweeps, change execution). Shares the
   # API image and code; runs the RQ worker instead of uvicorn.
   worker:
     build:
